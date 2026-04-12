@@ -1,0 +1,15 @@
+# [Python]
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# [Environment Variables] - 절대 공유 금지
+.env
+app/.env
+
+# [Database] - 로컬 DB 데이터는 제외
+app/db/postgres_data/
+
