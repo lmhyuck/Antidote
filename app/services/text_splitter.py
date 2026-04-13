@@ -1,25 +1,27 @@
+import re
 import logging
 from typing import List
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 logger = logging.getLogger(__name__)
 
 class ContractSplitter:
-    def __init__(self, chunk_size: int = 500, chunk_overlap: int = 50):
-        # chunk_size: 한 조각의 최대 길이
-        # chunk_overlap: 문맥 유지를 위해 앞 조각과 겹치는 부분 (중요!)
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=["\n\n", "\n", " ", ""] # 계약서는 줄바꿈 기준이 가장 깔끔함
-        )
+    def __init__(self):
+        # 조항을 구분할 정규표현식 패턴 (숫자. 형태)
+        # 예: "1. ", "2. " 등을 기준으로 분할
+        self.split_pattern = re.compile(r'\n(?=\d+\.)')
 
     def split_contract(self, text: str) -> List[str]:
         if not text:
             return []
-        
-        chunks = self.splitter.split_text(text)
-        logger.info(f"✂️ 텍스트 분할 완료: {len(chunks)} 개의 청크 생성")
-        return chunks
+
+        # 1. 정규표현식 패턴을 기준으로 텍스트 분할
+        # 단순 split이 아니라 패턴을 유지하면서 자르기 위해 re.split 사용
+        chunks = self.split_pattern.split(text)
+
+        # 2. 공백 제거 및 빈 청크 필터링
+        cleaned_chunks = [c.strip() for c in chunks if c.strip()]
+
+        logger.info(f"✂️ 조항 기준 분할 완료: {len(cleaned_chunks)} 개의 조항 생성")
+        return cleaned_chunks
 
 contract_splitter = ContractSplitter()

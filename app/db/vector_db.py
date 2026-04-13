@@ -1,52 +1,92 @@
 from sqlalchemy import Column, Integer, Text, String, Float, DateTime, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
+import logging
+
 from app.core.config import settings
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
-# 1. 법률 지식 베이스 (RAG용: 판례, 법령 등)
-class LegalKnowledge(Base):
-    __tablename__ = 'legal_knowledge'
+# 1. 실제 판례 데이터 테이블 (Case Law)
+class Precedent(Base):
+    """
+    사건번호, 위반조항을 기반으로 판례 내용을 벡터화하여 저장
+    """
+    __tablename__ = 'precedents'
     
-    id = Column(Integer, primary_key=True)
-    content = Column(Text, nullable=False)
-    embedding = Column(Vector(settings.VECTOR_DIMENSION)) # 768차원
-    reference_id = Column(String, unique=True)            # 판례 번호 등
-    category = Column(String)                             # 임금, 근로시간 등
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-# 2. 계약서 조항 분석 결과 (koELECTRA 추론 결과 저장용)
-class ClauseAnalysis(Base):
-    __tablename__ = 'clause_analyses'
-
-    id = Column(Integer, primary_key=True)
-    contract_id = Column(String, index=True)      # 계약서 식별자
-    clause_text = Column(Text, nullable=False)    # 조항 원문
-    
-    # koELECTRA 추론 데이터
-    prediction_label = Column(String)             # 유/불리 결과 (Advantage/Disadvantage)
-    confidence_score = Column(Float)              # 모델 확신도
-    
-    # 재학습용 CLS 벡터 저장 (선택 사항이지만 강력 권장)
-    # 추후 데이터 분포 분석이나 유사도 검색에 활용
-    cls_vector = Column(Vector(settings.VECTOR_DIMENSION)) 
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    case_number = Column(String, unique=True, index=True, nullable=False) # 사건번호
+    violated_article = Column(String, index=True)                       # 위반조항 (예: 근로기준법 제43조)
+    content = Column(Text, nullable=False)                             # 판례 내용 원문
+    embedding = Column(Vector(settings.BGE_M3_DIMENSION), nullable=False) # bge-m3 벡터
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# --- DB 엔진 및 초기화 로직 ---
-engine = create_engine(settings.DATABASE_URL)
+# 2. 근로기준법 데이터 테이블 (Statutes)
+class LaborLaw(Base):
+    """
+    근로기준법의 조, 항, 호 단위를 유지하며 벡터화하여 저장
+    """
+    __tablename__ = 'labor_laws'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    article_num = Column(String, index=True)  # 제N조 (예: 제2조)
+    paragraph_num = Column(String, index=True) # ①, ② 등 (항)
+    item_num = Column(String, index=True)      # 1., 2. 등 (호)
+    
+    law_content = Column(Text, nullable=False) # 해당 조항의 구체적 텍스트
+    embedding = Column(Vector(settings.BGE_M3_DIMENSION), nullable=False) # bge-m3 벡터
+    
+    # 조항 전체 경로 (예: 근로기준법 제2조 제1항 제4호) - LLM 참조용
+    full_reference = Column(String, nullable=False) 
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# 3. 계약서 조항 분석 결과 테이블 (Analysis Results)
+class ContractAnalysis(Base):
+    """
+    분석된 독소 조항, 신뢰도, 결과, 수정본을 저장
+    """
+    __tablename__ = 'contract_analysis'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    contract_id = Column(String, index=True, nullable=False)
+    original_clause = Column(Text, nullable=False)     # 분석 대상 원문 조항
+    
+    prediction_result = Column(String)                # 독소 조항 여부 (Toxic/Safe)
+    confidence_score = Column(Float)                  # 모델 신뢰도
+    analysis_report = Column(Text)                    # 상세 분석 내용
+    suggested_revision = Column(Text)                 # AI가 제안한 수정본
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# --- DB 엔진 및 초기화 ---
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
-    """DB 초기 설정: pgvector 활성화 및 모든 테이블 생성"""
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        conn.commit()
-    Base.metadata.create_all(bind=engine)
-    print("✅ Antidote 하이브리드 벡터 DB 환경 구축 완료")
+    """DB 초기화 및 벡터 인덱스 최적화"""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            conn.commit()
+            Base.metadata.create_all(bind=engine)
+            
+            # HNSW 인덱스: 판례와 법령 검색 속도 향상
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_precedents_v ON precedents USING hnsw (embedding vector_cosine_ops);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_labor_laws_v ON labor_laws USING hnsw (embedding vector_cosine_ops);"))
+            conn.commit()
+            
+        logger.info("✅ Antidote 3-Tier DB Schema 구축 완료")
+    except SQLAlchemyError as e:
+        logger.error(f"❌ DB 초기화 실패: {e}")
+        raise
 
 def get_db():
     db = SessionLocal()

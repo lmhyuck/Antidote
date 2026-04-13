@@ -1,24 +1,51 @@
-# 모델 로더 및 환경 세팅
 import torch
+import logging
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sentence_transformers import SentenceTransformer
 from app.core.config import settings
+
+# Uvicorn 로거와 통합하여 터미널에 로그가 반드시 찍히도록 설정
+logger = logging.getLogger("uvicorn.error")
 
 class ModelLoader:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_name = settings.MODEL_NAME
         
-        # 1. 토크나이저 로드
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        logger.info("==================================================")
+        logger.info(f"⏳ Antidote AI Engines Loading... (Device: {self.device})")
         
-        # 2. 분류 모델 로드 (유/불리 2개 라벨 기준)
-        # num_labels는 나중에 학습된 가중치를 불러올 때 중요합니다.
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            self.model_name, 
-            num_labels=2 
+        # 1. KoELECTRA-Small (Detection)
+        self.small_model_name = settings.KOELECTRA_SMALL_MODEL
+        self.small_tokenizer = AutoTokenizer.from_pretrained(self.small_model_name)
+        self.small_model = AutoModelForSequenceClassification.from_pretrained(
+            self.small_model_name, num_labels=2
         ).to(self.device)
         
-        print(f"✅ 모델 로드 완료: {self.model_name} (Device: {self.device})")
+        # 2. KoELECTRA-Base (Re-ranking)
+        self.base_model_name = settings.KOELECTRA_BASE_MODEL
+        self.base_tokenizer = AutoTokenizer.from_pretrained(self.base_model_name)
+        self.base_model = AutoModelForSequenceClassification.from_pretrained(
+            self.base_model_name, num_labels=2
+        ).to(self.device)
 
-# 전역 객체로 생성하여 어디서든 참조 가능하게 함
+        # 3. BGE-M3 (Embedding)
+        self.bge_model_name = settings.BGE_M3_MODEL
+        self.bge_model = SentenceTransformer(self.bge_model_name, device=self.device)
+
+        logger.info("✅ All Models Loaded Successfully!")
+        logger.info(f"   - Small  : {self.small_model_name}")
+        logger.info(f"   - Base   : {self.base_model_name}")
+        logger.info(f"   - BGE-M3 : {self.bge_model_name}")
+        logger.info("==================================================")
+
+    def get_small_model(self):
+        return self.small_model, self.small_tokenizer
+
+    def get_base_model(self):
+        return self.base_model, self.base_tokenizer
+
+    def get_bge_model(self):
+        return self.bge_model
+
+# 싱글톤 객체 생성
 ml_engine = ModelLoader()

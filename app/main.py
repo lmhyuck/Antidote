@@ -1,55 +1,80 @@
+import uvicorn
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.v1 import analysis, chatbot
 from app.core.config import settings
-from app.db.vector_db import engine, Base
-from app.db.vector_db import init_db
-from app.core.model_loader import ml_engine
+from app.db.vector_db import init_db, SessionLocal,LaborLaw
 
-# 1. 데이터베이스 테이블 생성 (애플리케이션 실행 시)
-init_db()
-
-# koELECTRA 모델 메모리 로드
-# 이 시점에 ml_engine 객체가 생성되면서 모델을 메모리에 올립니다.
-_ = ml_engine.model
-
-# pgvector 확장이 활성화된 DB에서 AntidoteCase 테이블을 생성합니다.
-Base.metadata.create_all(bind=engine)
+# 로깅 설정 (Uvicorn 표준 출력과 통합)
+logger = logging.getLogger("uvicorn.error")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="근로계약서 독소조항 분석 및 법률 질의응답 서비스 'Antidote'",
+    description="근로계약서 독소조항 분석 서비스 'Antidote'",
     version="1.0.0"
 )
 
-# 2. CORS 설정 (프론트엔드 격리 대응)
-# 프론트엔드와 백엔드가 포트가 다르므로 통신 허용이 필요합니다.
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 실제 배포 시에는 프론트엔드 주소만 허용하도록 수정
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 3. API 라우터 등록
-# 각 기능을 별도 파일로 분리하여 유지보수성을 높였습니다.
-app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["Analysis"])
-app.include_router(chatbot.router, prefix="/api/v1/chatbot", tags=["Chatbot"])
+# 서버 시작 시 실행될 로직 (Startup Event)
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 Antidote 백엔드 서비스를 시작합니다...")
+    
+    # 1. DB 초기화 (Table 생성 및 pgvector 확장 확인)
+    try:
+        init_db()
+        logger.info("✅ 데이터베이스 초기화 완료")
+    except Exception as e:
+        logger.error(f"❌ 데이터베이스 초기화 실패: {e}")
+
+    # 2. 기초 법령 데이터(LaborLaw) 자동 적재 확인
+    db = SessionLocal()
+    try:
+        # 테이블 내 데이터 개수 확인
+        law_count = db.query(LaborLaw).count()
+        if law_count == 0:
+            logger.info("📡 기초 법령 데이터가 없습니다. 자동 벡터 적재를 시작합니다...")
+            
+            # store_embeddings.py (또는 ingest_laws.py)에서 인입 함수 호출
+            # 순환 참조 방지를 위해 함수 내부에서 임포트
+            from app.scripts.ingest_laws import ingest_labor_laws
+            
+            csv_path = "data/근로기준법_조항.csv"
+            ingest_labor_laws(csv_path)
+        else:
+            logger.info(f"✅ 기존 법령 데이터 확인됨 ({law_count}건). 자동 적재를 건너뜁니다.")
+    except Exception as e:
+        logger.error(f"❌ 데이터 적재 프로세스 중 오류 발생: {e}")
+    finally:
+        db.close()
+
+    # 3. AI 모델 로더 상태 확인 (메모리 로드 보장)
+    from app.core.model_loader import ml_engine
+    logger.info(f"💡 AI 엔진 준비 상태: {ml_engine.device}")
+
+# API 라우터 등록
+app.include_router(analysis.router, prefix=f"{settings.API_V1_STR}/analysis", tags=["Analysis"])
+app.include_router(chatbot.router, prefix=f"{settings.API_V1_STR}/chatbot", tags=["Chatbot"])
 
 @app.get("/")
-def read_root():
-    """
-    서버 상태 확인을 위한 헬스체크 엔드포인트
-    """
+def health_check():
     return {
-        "message": f"Welcome to {settings.PROJECT_NAME} API",
+        "app": settings.PROJECT_NAME,
         "status": "online",
         "docs": "/docs"
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    # 로컬 터미널에서 실행하기 위한 설정
-    # 포트 넘버는 8000을 사용합니다.
+    # Windows의 spawn 문제 방지를 위해 uvicorn.run 설정
+    # port=8000 사용
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

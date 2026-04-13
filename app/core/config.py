@@ -1,12 +1,11 @@
-# .env 로드 및 전역 설정
-
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
+# 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__)) # app/core
 app_dir = os.path.dirname(current_dir) # app
-env_path = os.path.join(app_dir, ".env")
+env_path = os.path.join(app_dir, ".env") # 루트의 .env 참조
 
 class Settings(BaseSettings):
     # [1] Project Basic Config
@@ -14,31 +13,36 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
-    # [2] Database Config (PostgreSQL/PostGIS)
-    DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/antidote"
+    # [2] Database Config
+    DATABASE_URL: str
 
-    # [3] AI Model Config (koELECTRA)
-    MODEL_NAME: str = "monologg/koelectra-base-v3-discriminator"
-    MAX_SEQ_LENGTH: int = 512
-    VECTOR_DIMENSION: int = 768
+# [3] AI Model Names
+    KOELECTRA_BASE_MODEL: str = "monologg/koelectra-base-v3-discriminator"
+    KOELECTRA_SMALL_MODEL: str = "monologg/koelectra-small-v3-discriminator"
+    BGE_M3_MODEL: str = "BAAI/bge-m3"
 
-    # [4] OCR Config (Naver CLOVA OCR)
-    # 실제 키가 없을 때 에러가 나지 않도록 기본값을 주거나 Optional로 설정합니다.
-    OCR_API_URL: str = "https://your-ocr-endpoint.com"
-    OCR_SECRET_KEY: str = "your-secret-key"
+    # [4] Vector Dimensions
+    # LegalKnowledge, LaborLaw 테이블용 (bge-m3)
+    BGE_M3_DIMENSION: int = 1024
+    
+    # ContractAnalysis 테이블의 cls_vector 저장용
+    # 어떤 모델의 CLS를 저장하느냐에 따라 선택해서 사용
+    KOELECTRA_BASE_DIMENSION: int = 768
+    KOELECTRA_SMALL_DIMENSION: int = 512 
 
-    # [5] External API Config
-    # OpenAI 키가 없으면 ValidationError가 발생하므로 Optional로 처리합니다.
+    # 파이프라인에서 기본으로 사용할 차원 지정 (하위 호환성)
+    VECTOR_DIMENSION: int = 1024
+
+    # [6] External API Keys
     OPENAI_API_KEY: Optional[str] = None
+    OCR_API_URL: Optional[str] = None
+    OCR_SECRET_KEY: Optional[str] = None
 
-    # [6] Pydantic Settings Configuration
-    # .env 파일을 찾아서 환경변수로 로드합니다.
     model_config = SettingsConfigDict(
         env_file=env_path,
         env_file_encoding="utf-8",
-        case_sensitive=False,  # 대소문자 구분 없이 .env 키값 매칭
+        case_sensitive=False,
         extra='ignore'
     )
 
-# 전역 객체 생성
 settings = Settings()
