@@ -4,6 +4,9 @@
 
 ```bash
 
+# 초기 도커 실행
+docker-compose up
+
 # 필수 패키지 설치
 pip install -r requirements.txt
 
