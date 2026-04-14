@@ -1,6 +1,6 @@
 #계약서 분석 엔드포인트
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from Antidote.app.services.pdf_extractor import pdf_extractor
+from app.services.pdf_extractor import pdf_extractor
 
 router = APIRouter()
 

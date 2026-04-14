@@ -12,21 +12,34 @@ logger = logging.getLogger("uvicorn.error")
 
 def parse_law_details(text: str):
     """
-    정규표현식을 이용한 조, 항, 호 상세 파싱 로직
+    정규표현식을 이용한 조, 항, 호 상세 파싱 및 순수 내용 추출 로직
     """
-    # 조: 제12조, 제12조의2 등 처리
-    article = re.search(r'제\d+조(?:의\d+)?', text)
-    article_num = article.group() if article else ""
+    # 조: 제12조, 제12조의2 등
+    article_match = re.search(r'제\d+조(?:의\d+)?', text)
+    article_num = article_match.group() if article_match else ""
     
     # 항: ①, ②, ③ 등 원문자
-    paragraph = re.search(r'[\u2460-\u246b]', text)
-    paragraph_num = paragraph.group() if paragraph else ""
+    paragraph_match = re.search(r'[\u2460-\u246b]', text)
+    paragraph_num = paragraph_match.group() if paragraph_match else ""
     
-    # 호: 1., 2. 형태 (공백 뒤에 오는 숫자+점)
-    item = re.search(r'(?<=\s)\d+\.', text)
-    item_num = item.group() if item else ""
+    # 호: 1., 2. 형태
+    item_match = re.search(r'(?<=\s)\d+\.', text)
+    item_num = item_match.group() if item_match else ""
     
-    return article_num, paragraph_num, item_num
+    # [핵심] 식별자들을 텍스트에서 제거하여 순수 내용만 추출
+    # 조, 항, 호 번호와 그 뒤의 불필요한 공백을 제거합니다.
+    clean_content = text
+    if article_num:
+        clean_content = clean_content.replace(article_num, "")
+    if paragraph_num:
+        clean_content = clean_content.replace(paragraph_num, "")
+    if item_num:
+        clean_content = clean_content.replace(item_num, "")
+    
+    # 앞뒤 공백 및 중복 공백 정리
+    clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+    
+    return article_num, paragraph_num, item_num, clean_content
 
 def ingest_labor_laws(file_path: str):
     """
@@ -53,16 +66,14 @@ def ingest_labor_laws(file_path: str):
 
         for _, row in df.iterrows():
             raw_text = row['text']
-            article, paragraph, item = parse_law_details(raw_text)
+            article, paragraph, item , clean_content= parse_law_details(raw_text)
             
             # 2. 검색 최적화를 위한 참조명 생성
             # 예: 근로기준법 제2조 ① 1.
             full_ref = f"근로기준법 {article} {paragraph} {item}".strip()
             
             # 3. 벡터화 (BGE-M3)
-            # 텍스트와 레퍼런스를 함께 넣어 문맥을 강화합니다.
-            combined_text = f"{full_ref} | {raw_text}"
-            embedding = embed_model.encode(combined_text).tolist()
+            embedding = embed_model.encode(clean_content).tolist()
 
             # 4. ORM 객체 매핑
             law_entry = LaborLaw(
