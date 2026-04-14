@@ -21,6 +21,7 @@ torch
 transformers
 scikit-learn
 pymupdf
+sentence_transformers
 
 langchain>=0.1.0
 langchain-community
