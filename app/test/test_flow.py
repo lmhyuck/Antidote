@@ -86,33 +86,44 @@ def test_full_rag_flow():
         print("="*80)
 
         for i, chunk in enumerate(chunks, 1):
+            # [수정] 의미 없는 짧은 청크(공백, 줄바꿈만 있는 경우)는 건너뜁니다.
+            clean_chunk = chunk.strip()
+            if len(clean_chunk) < 5:  # 최소 5자 이상일 때만 분석
+                continue
+
             print(f"\n🔍 [분석 조항 {i}]")
-            print(f"내용: {chunk.strip()[:100]}...") 
+            print(f"내용: {clean_chunk[:100]}...") 
             
-            # A. 관련 법령 검색
-            related_laws = get_related_laws(chunk)
-            # B. 관련 판례 검색 (추가된 부분)
-            related_precedents = get_related_precedents(chunk)
+            # A. 관련 법령 검색 (변수 초기화 보장)
+            related_laws = get_related_laws(clean_chunk)
+            # B. 관련 판례 검색
+            related_precedents = get_related_precedents(clean_chunk)
             
             # 법령 결과 출력
             print(f"\n   ⚖️ [관련 법령]")
             if related_laws:
+                # 중복 출력을 방지하기 위해 집합(set) 등으로 관리할 수도 있지만, 
+                # 일단 리스트 결과를 정확히 하나씩만 출력합니다.
                 for law in related_laws:
                     print(f"    - {law.full_reference}")
-                    print(f"      내용: {law.law_content[:100]}...")
+                    print(f"      내용: {law.law_content[:100].replace(os.linesep, ' ')}...")
             else:
                 print("    - ⚠️ 매칭된 법령 없음")
 
-            # 판례 결과 출력 (추가된 부분)
+            # 판례 결과 출력
             print(f"\n   📜 [참조 판례]")
             if related_precedents:
                 for pre in related_precedents:
                     print(f"    - 사건번호: {pre.case_number} ({pre.violated_article})")
-                    print(f"      판례요약: {pre.content[:100]}...")
+                    print(f"      판례요약: {pre.content[:100].replace(os.linesep, ' ')}...")
             else:
                 print("    - ⚠️ 매칭된 판례 없음")
 
             print("-" * 80)
+            
+            # [추가] 출력 후 명시적으로 변수 비우기 (파이썬 특성상 필수는 아니지만 안전함)
+            del related_laws
+            del related_precedents
 
     except Exception as e:
         logger.error(f"❌ 통합 테스트 중 에러 발생: {e}", exc_info=True)
