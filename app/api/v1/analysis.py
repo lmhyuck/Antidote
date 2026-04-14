@@ -1,6 +1,6 @@
 #계약서 분석 엔드포인트
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from Antidote.app.services.pdf_extractor import ocr_manager
+from Antidote.app.services.pdf_extractor import pdf_extractor
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ async def upload_contract(file: UploadFile = File(...)):
     content = await file.read()
     
     # 3. OCR 실행
-    extracted_text = ocr_manager.extract_text(content, file.filename)
+    extracted_text = pdf_extractor.extract_text(content, file.filename)
     
     if not extracted_text:
         raise HTTPException(status_code=500, detail="텍스트 추출에 실패했습니다.")
