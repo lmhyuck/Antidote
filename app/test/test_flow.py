@@ -3,11 +3,10 @@ import logging
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from app.services.pdf_extractor import pdf_extractor
+from app.services.extractor import extractor as ex
 from app.services.text_splitter import contract_splitter
 from app.core.model_loader import ml_engine
 from app.db.vector_db import SessionLocal
-# Precedent 모델 추가 임포트
 from app.db.vector_db import LaborLaw, Precedent 
 
 # 로깅 설정
@@ -71,7 +70,7 @@ def test_full_rag_flow():
             file_content = f.read()
             file_name = os.path.basename(sample_path)
         
-        raw_text: Optional[str] = pdf_extractor.extract_text(file_content, file_name)
+        raw_text: Optional[str] = ex.pdf_extractor(file_content, file_name)
         if not raw_text: return
 
         # 2. 텍스트 분할 (Chunking)

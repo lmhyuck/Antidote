@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* 폰트 */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap");
+
+/*  2. CSS 변수 (design token) */
+:root {
+  --primary: #1a73e8;
+  --primary-hover: #1557b0;
+  --surface: #f8fafc; /* slate-50 */
+  --text-primary: #0f172a; /* slate-900 */
+  --text-muted: #64748b; /* slate-500 */
+  --border: #f1f5f9; /* slate-100 */
+}
+
+/* 3. body 기본 설정 */
+body {
+  font-family: "Manrope", sans-serif;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* 4. 스크롤바 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 99px;
+}
+button:active {
+  transform: scale(0.98);
+}
