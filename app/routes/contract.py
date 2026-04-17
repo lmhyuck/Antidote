@@ -5,3 +5,4 @@ router = APIRouter(prefix="/api/legal", tags=["Legal Analysis"])
 
 
 router.add_api_route("/contract", contract.contract, methods=["POST"])
+

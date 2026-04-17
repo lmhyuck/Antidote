@@ -1,92 +1,58 @@
-# 벡터 DB 데이터 적재용 스크립트
 import pandas as pd
-import re
 import os
 import logging
 from sqlalchemy.orm import Session
-from app.db.vector_db import SessionLocal
-from app.db.vector_db import LaborLaw
+from app.db.vector_db import SessionLocal, LaborLaw
 from app.core.model_loader import ml_engine
 
 logger = logging.getLogger("uvicorn.error")
 
-def parse_law_details(text: str):
-    """
-    정규표현식을 이용한 조, 항, 호 상세 파싱 및 순수 내용 추출 로직
-    """
-    # 조: 제12조, 제12조의2 등
-    article_match = re.search(r'제\d+조(?:의\d+)?', text)
-    article_num = article_match.group() if article_match else ""
-    
-    # 항: ①, ②, ③ 등 원문자
-    paragraph_match = re.search(r'[\u2460-\u246b]', text)
-    paragraph_num = paragraph_match.group() if paragraph_match else ""
-    
-    # 호: 1., 2. 형태
-    item_match = re.search(r'(?<=\s)\d+\.', text)
-    item_num = item_match.group() if item_match else ""
-    
-    # [핵심] 식별자들을 텍스트에서 제거하여 순수 내용만 추출
-    # 조, 항, 호 번호와 그 뒤의 불필요한 공백을 제거합니다.
-    clean_content = text
-    if article_num:
-        clean_content = clean_content.replace(article_num, "")
-    if paragraph_num:
-        clean_content = clean_content.replace(paragraph_num, "")
-    if item_num:
-        clean_content = clean_content.replace(item_num, "")
-    
-    # 앞뒤 공백 및 중복 공백 정리
-    clean_content = re.sub(r'\s+', ' ', clean_content).strip()
-    
-    return article_num, paragraph_num, item_num, clean_content
-
 def ingest_labor_laws(file_path: str):
-    """
-    벡터 DB 데이터 적재 메인 함수
-    """
     db: Session = SessionLocal()
-    # BGE-M3 모델 가져오기
     embed_model = ml_engine.get_bge_model()
     
     try:
-        # 파일 존재 여부를 먼저 확인하고, 없으면 절대 경로로 재시도
+        # 파일 경로 설정 로직 (기존 유지)
         if not os.path.exists(file_path):
-            # 현재 파일(ingest_laws.py)의 위치를 기준으로 프로젝트 루트를 찾아 경로 재설정
             base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             file_path = os.path.join(base_path, "data", "근로기준법_조항.csv")
             
         logger.info(f"🔎 파일 읽기 시도 중: {os.path.abspath(file_path)}")
         
-        df = pd.read_csv(file_path)
+        # utf-8-sig 인코딩을 사용하여 눈에 안 보이는 BOM(\ufeff) 제거
+        df = pd.read_csv(file_path, encoding='utf-8-sig')
+        
+        df.columns = [col.strip() for col in df.columns]
         
         laws_to_add = []
         
         logger.info(f"⏳ {len(df)}건의 법령 데이터 벡터화 시작...")
 
         for _, row in df.iterrows():
-            raw_text = row['text']
-            article, paragraph, item , clean_content= parse_law_details(raw_text)
-            
-            # 2. 검색 최적화를 위한 참조명 생성
-            # 예: 근로기준법 제2조 ① 1.
-            full_ref = f"근로기준법 {article} {paragraph} {item}".strip()
+            # 1. 컬럼 매핑 (이미지 기반)
+            article_num = str(row['조 번호']).strip()     # 제1조
+            paragraph_num = str(row['조항 번호']).strip() # 제1조 (또는 제2조 1항 등)
+            keyword = str(row['조(키워드)']).strip()      # 제1조(목적)
+            summary = str(row['요약 내용']).strip()      # 헌법에 따라...
+            full_content = str(row['통합 내용']).strip()  # 제1조(목적) 헌법에 따라...
             
             # 3. 벡터화 (BGE-M3)
-            embedding = embed_model.encode(clean_content).tolist()
+            # 검색 정확도를 높이기 위해 '요약 내용'이나 '통합 내용' 중 선택하여 임베딩합니다.
+            # 현재는 통합 내용 임베딩 -> 추후 검증 단계에서 정확도 부족 시 요약 내용을 임베딩
+            embedding = embed_model.encode(full_content).tolist()
 
             # 4. ORM 객체 매핑
             law_entry = LaborLaw(
-                article_num=article,
-                paragraph_num=paragraph,
-                item_num=item,
-                law_content=raw_text,
-                full_reference=full_ref,
+                article_num=article_num,
+                paragraph_num=paragraph_num,
+                keyword=keyword, 
+                summary=summary,
+                law_content=full_content,  
                 embedding=embedding
             )
             laws_to_add.append(law_entry)
 
-        # 5. 벌크 저장 (성능 최적화)
+        # 5. 벌크 저장
         db.bulk_save_objects(laws_to_add)
         db.commit()
         logger.info(f"✅ 법령 데이터 {len(laws_to_add)}건 적재 완료!")

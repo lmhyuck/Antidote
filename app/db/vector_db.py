@@ -31,20 +31,23 @@ class Precedent(Base):
 # 2. 근로기준법 데이터 테이블 (Statutes)
 class LaborLaw(Base):
     """
-    근로기준법의 조, 항, 호 단위를 유지하며 벡터화하여 저장
+    수정된 CSV 구조를 반영한 근로기준법 데이터 테이블
     """
     __tablename__ = 'labor_laws'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    article_num = Column(String, index=True)  # 제N조 (예: 제2조)
-    paragraph_num = Column(String, index=True) # ①, ② 등 (항)
-    item_num = Column(String, index=True)      # 1., 2. 등 (호)
     
-    law_content = Column(Text, nullable=False) # 해당 조항의 구체적 텍스트
-    embedding = Column(Vector(settings.BGE_M3_DIMENSION), nullable=False) # bge-m3 벡터
+    # 1. 고유 식별 정보 (검색 및 필터링용)
+    article_num = Column(String, index=True)   # 조 번호 (제1조)
+    paragraph_num = Column(String, index=True) # 조항 번호 (제1조 1항 등)
+    keyword = Column(String, index=True)       # 조(키워드) (제1조(목적) 등)
     
-    # 조항 전체 경로 (예: 근로기준법 제2조 제1항 제4호) - LLM 참조용
-    full_reference = Column(String, nullable=False) 
+    # 2. 내용 정보 (검색 및 응답용)
+    summary = Column(Text, nullable=True)      # 추천 요약 (LLM에게 제공할 핵심 요약)
+    law_content = Column(Text, nullable=False) # 통합 내용 (원문 전체)
+    
+    # 4. 벡터화 정보 (BGE-M3)
+    embedding = Column(Vector(settings.BGE_M3_DIMENSION), nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
