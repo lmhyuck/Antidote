@@ -18,8 +18,10 @@ class ModelLoader:
         self.small_model_name = settings.KOELECTRA_SMALL_MODEL
         self.small_tokenizer = AutoTokenizer.from_pretrained(self.small_model_name)
         self.small_model = AutoModelForSequenceClassification.from_pretrained(
-            self.small_model_name, num_labels=2
+            self.small_model_name
         ).to(self.device)
+        # 추론 모드로 설정 (중요: 드롭아웃 등을 비활성화하여 결과 일관성 유지)
+        self.small_model.eval()
         
         # 2. KoELECTRA-Base (Re-ranking)
         self.base_model_name = settings.KOELECTRA_BASE_MODEL
@@ -46,6 +48,7 @@ class ModelLoader:
 
     def get_bge_model(self):
         return self.bge_model
+    
 
 # 싱글톤 객체 생성
 ml_engine = ModelLoader()

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.lifecycle import startup_event  
-from app.routes.contract import router
+from app.routes.analysis import router
 
 # 로깅 설정
 logger = logging.getLogger("uvicorn.error")

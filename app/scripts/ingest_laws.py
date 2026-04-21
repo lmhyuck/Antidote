@@ -39,7 +39,7 @@ def ingest_labor_laws(file_path: str):
             # 3. 벡터화 (BGE-M3)
             # 검색 정확도를 높이기 위해 '요약 내용'이나 '통합 내용' 중 선택하여 임베딩합니다.
             # 현재는 통합 내용 임베딩 -> 추후 검증 단계에서 정확도 부족 시 요약 내용을 임베딩
-            embedding = embed_model.encode(full_content).tolist()
+            embedding = embed_model.encode(summary).tolist()
 
             # 4. ORM 객체 매핑
             law_entry = LaborLaw(
