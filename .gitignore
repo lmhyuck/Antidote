@@ -13,3 +13,5 @@ app/.env
 # [Database] - 로컬 DB 데이터는 제외
 app/db/postgres_data/
 
+# [Model]
+app/models/
