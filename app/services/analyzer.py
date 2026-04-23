@@ -2,6 +2,7 @@ import fitz
 import torch
 import logging
 import json
+from google import genai
 import torch.nn.functional as F
 from datetime import datetime
 from typing import Dict, Any
@@ -17,51 +18,61 @@ class LegalAnalyzer:
     def __init__(self):
         self.processor = TextProcessor()
         self.db_search = DBSearch()
-        # self.guardrail_model = ml_engine.get_guardrail_model()
+        self.client, self.model_name = ml_engine.get_gemini_client()
         
-        # self.SYSTEM_PROMPT = """
-        # 너는 법률 계약 검토 서비스 'ANTIDOTE'의 안내원이야. 
-        # 입력된 텍스트가 '계약서 조항 분석'이나 '법률적 위험도 확인'과 관련이 있는지 판단해줘.
+        self.SYSTEM_PROMPT = """
+        너는 법률 계약 검토 서비스 'ANTIDOTE'의 안내원이야. 
+        입력된 텍스트가 '계약서 조항 분석'이나 '법률적 위험도 확인'과 관련이 있는지 판단해줘.
 
-        # [판단 기준]
-        # 1. 계약서 조항(임금, 해고, 비밀유지 등)이거나 법적 권리 질문인 경우: {"is_valid": true}
-        # 2. 일상 대화, 맛집 질문, 단순 지식 질문인 경우: {"is_valid": false, "guide_message": "정중한 안내 텍스트"}
+        [판단 기준]
+        1. 계약서 조항(임금, 해고, 비밀유지 등)이거나 법적 권리 질문인 경우: {"is_valid": true}
+        2. 일상 대화, 맛집 질문, 단순 지식 질문인 경우: {"is_valid": false, "guide_message": "정중한 안내 텍스트"}
 
-        # 가이드 메시지 예시: "ANTIDOTE는 계약서의 독소 조항을 분석하는 전문 서비스입니다. 분석을 원하시는 조항을 복사하여 입력해 주세요."
-        # 반드시 JSON 형식으로만 응답해.
-        # """
+        가이드 메시지 예시: "ANTIDOTE는 계약서의 독소 조항을 분석하는 전문 서비스입니다. 분석을 원하시는 조항을 복사하여 입력해 주세요."
+        반드시 JSON 형식으로만 응답해.
+        """
 
-    # async def _check_validity(self, text: str):
-    #     if not self.guardrail_model:
-    #         return {"is_valid": True}
-    #     try:
-    #         # 이전 방식의 호출 문법
-    #         response = self.guardrail_model.generate_content(
-    #             f"{self.SYSTEM_PROMPT}\n\n사용자 입력: {text}",
-    #             generation_config=genai.types.GenerationConfig(
-    #                 temperature=0.1,
-    #                 response_mime_type="application/json"
-    #             )
-    #         )
-    #         return json.loads(response.text)
-    #     except Exception as e:
-    #         logger.error(f"Guardrail Error: {e}")
-    #         return {"is_valid": True}
+    async def _check_validity(self, text: str):
+        if not self.client:
+            return {"is_valid": True}
+            
+        max_retries = 3
+    
+        for i in range(max_retries):
+            try:
+                # --- [수정] 신규 SDK 호출 문법 ---
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=f"{self.SYSTEM_PROMPT}\n\n사용자 입력: {text}",
+                    config={
+                        "temperature": 0.1,
+                        "response_mime_type": "application/json"
+                    }
+                )
+                # 신규 SDK는 결과값이 response.text에 담깁니다.
+                return json.loads(response.text)
+            except Exception as e:
+                if "503" in str(e) and i < max_retries - 1:
+                    logger.warning(f"서버 과부하로 재시도 중... ({i+1}/{max_retries})")
+                    await asyncio.sleep(2) # 2초 대기 후 다시 시도
+                    continue
+                logger.error(f"Guardrail Error: {e}")
+                return {"is_valid": True}
 
     async def analyze(self, text: str, doc_name: str):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # # 0. 가드레일 체크 (실패 시)
-        # validity = await self._check_validity(text)
-        # if not validity.get("is_valid", True):
-        #     return {
-        #         "status": "invalid_query",
-        #         "message": validity.get("guide_message", "계약서 조항을 입력해 주세요."),
-        #         "doc_name": doc_name,
-        #         "total_risk_score": 0.0,
-        #         "results": [],  # 프론트에서 map() 함수 에러 방지를 위해 빈 배열 유지
-        #         "analyzed_at": now
-        #     }
+        # 0. 가드레일 체크 (실패 시)
+        validity = await self._check_validity(text)
+        if not validity.get("is_valid", True):
+            return {
+                "status": "invalid_query",
+                "message": validity.get("guide_message", "계약서 조항을 입력해 주세요."),
+                "doc_name": doc_name,
+                "total_risk_score": 0.0,
+                "results": [],  # 프론트에서 map() 함수 에러 방지를 위해 빈 배열 유지
+                "analyzed_at": now
+            }
 
         # 1. 텍스트 청킹
         chunks = self.processor.smart_chunking(text)

@@ -279,8 +279,7 @@ const LegalAIAssistant = () => {
                       가능한 내용
                     </h4>
                     <p className="text-sm text-slate-500">
-                      임대차 계약서 조항, 근로계약서 손해배상 문구, 비밀유지
-                      서약 등
+                      근로계약서 관련 조항
                     </p>
                   </div>
                   <div className="bg-slate-50 p-6 rounded-[24px] text-left">

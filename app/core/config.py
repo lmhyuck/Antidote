@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     KOELECTRA_SMALL_MODEL: str
     BGE_M3_MODEL: str
     
-    # # [4] Gemini-api
-    # GEMINI_API_KEY: str
-    # GEMINI_MODEL_NAME: str = "models/gemini-1.5-flash"
+    # [4] Gemini-api
+    GEMINI_API_KEY: str
+    GEMINI_MODEL_NAME: str = "models/gemini-3.1-flash-lite-preview"
 
     # [5] Vector Dimensions
     BGE_M3_DIMENSION: int = 1024
