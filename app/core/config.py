@@ -25,8 +25,12 @@ class Settings(BaseSettings):
     KOELECTRA_BASE_MODEL: str
     KOELECTRA_SMALL_MODEL: str
     BGE_M3_MODEL: str
+    
+    # # [4] Gemini-api
+    # GEMINI_API_KEY: str
+    # GEMINI_MODEL_NAME: str = "models/gemini-1.5-flash"
 
-    # [4] Vector Dimensions
+    # [5] Vector Dimensions
     BGE_M3_DIMENSION: int = 1024
     KOELECTRA_BASE_DIMENSION: int = 768
     KOELECTRA_SMALL_DIMENSION: int = 512
@@ -34,13 +38,8 @@ class Settings(BaseSettings):
     # 파이프라인 하위 호환성을 위한 기본 차원
     VECTOR_DIMENSION: int = 1024
 
-    # [5] Model Settings
+    # [6] Model Settings
     MAX_SEQ_LENGTH: int = 512
-
-    # [6] External API Keys (필요 시 .env에 추가하여 사용)
-    OPENAI_API_KEY: Optional[str] = None
-    OCR_API_URL: Optional[str] = None
-    OCR_SECRET_KEY: Optional[str] = None
 
     # Pydantic 설정: .env 파일을 읽어오는 핵심 로직
     model_config = SettingsConfigDict(

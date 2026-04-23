@@ -37,7 +37,7 @@ async def contract(file: UploadFile = File(...)):
         
         # 3. 서비스 호출 (LegalAnalyzer의 메서드 호출)
         # 분리된 구조에 따라 analyze_pdf 호출
-        report_data = analyzer.analyze_pdf(content, file.filename)
+        report_data = await analyzer.analyze_pdf(content, file.filename)
         
         # 4. 결과 반환
         return JSONResponse(
@@ -62,7 +62,7 @@ async def analyze_text(data: TextInput):
         logger.info(f"📝 텍스트 분석 요청 수신: {data.doc_name}")
         
         # 서비스 호출 (LegalAnalyzer의 analyze 메서드 활용)
-        report_data = analyzer.analyze(data.content, data.doc_name)
+        report_data = await analyzer.analyze(data.content, data.doc_name)
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,

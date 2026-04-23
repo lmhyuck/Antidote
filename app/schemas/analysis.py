@@ -28,6 +28,8 @@ class ResultDetail(BaseModel):
 
 # 최종 응답 리포트
 class AnalysisReport(BaseModel):
+    status: str # "success" 또는 "invalid_query"
+    message: str # 성공 시 "분석 완료", 실패 시 가이드 메시지
     doc_name: str
     total_risk_score: float
     results: List[ResultDetail]

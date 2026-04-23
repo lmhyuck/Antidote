@@ -52,10 +52,13 @@ const LegalAIAssistant = () => {
   const [isRiskyOpen, setIsRiskyOpen] = useState(false);
   const [isSafeOpen, setIsSafeOpen] = useState(false);
 
+  // [추가] 가이드라인 모드 여부 판단 (status가 success가 아니면 가이드 모드)
+  const isGuideMode = report && report.status === "invalid_query";
+
   // [추가] 데이터 분리 로직 (report가 있을 때만 작동)
   const riskyClauses =
     report?.results?.filter(
-      (item) => item.level === "DANGER" || item.level === "WARNING"
+      (item) => item.level === "DANGER" || item.level === "WARNING",
     ) || [];
   const safeClauses =
     report?.results?.filter((item) => item.level === "SAFE") || [];
@@ -75,7 +78,7 @@ const LegalAIAssistant = () => {
     try {
       const response = await axios.post(
         "http://localhost:8000/analysis/contract", // 또는 설정하신 경로
-        formData
+        formData,
       );
 
       // 2. 백엔드에서 보낸 LegalReport 객체가 response.data에 들어있음
@@ -106,7 +109,21 @@ const LegalAIAssistant = () => {
         content: inputValue,
         doc_name: "직접 입력 분석",
       });
+
+      // 백엔드 응답 전체({status, message, results, ...})를 저장
       setReport(response.data);
+
+      // 만약 가이드라인 응답이라면 메시지 창에 추가 (피드백 강화)
+      if (response.data.status === "invalid_query") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: "bot",
+            text: response.data.message, // "계약서 조항을 입력해 주세요..." 등의 메시지
+          },
+        ]);
+      }
     } catch (error) {
       alert("분석 중 오류가 발생했습니다.");
     } finally {
@@ -185,7 +202,7 @@ const LegalAIAssistant = () => {
                 </span>
                 하세요
               </h1>
-              <p className="text-slate-500 mb-12 text-xl font-medium text-center max-w-2xl leading-relaxed">
+              <p className="text-slate-500 mb-12 text-base font-medium text-center max-w-2xl leading-relaxed">
                 의심되는 조항을 복사하여 붙여넣으세요. <br />
                 독소 조항 유무를 즉시 판별합니다.
               </p>
@@ -224,6 +241,57 @@ const LegalAIAssistant = () => {
                       {isLoading ? "분석 중..." : "분석 시작"}{" "}
                       <ArrowRight size={18} />
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : isGuideMode ? (
+            /* [추가 Step: 가이드라인 화면] - status가 invalid_query일 때 노출 */
+            <div className="animate-in slide-in-from-bottom-10 duration-700">
+              <button
+                onClick={() => {
+                  setReport(null);
+                  setInputValue("");
+                }}
+                className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold mb-8 transition-colors group"
+              >
+                <ChevronLeft
+                  size={20}
+                  className="group-hover:-translate-x-1 transition-transform"
+                />
+                다시 입력하기
+              </button>
+
+              <div className="bg-white rounded-[48px] shadow-2xl shadow-blue-900/10 border border-orange-100 overflow-hidden p-16 flex flex-col items-center text-center">
+                <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mb-8">
+                  <HelpCircle size={48} />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-4">
+                  입력 내용을 확인해 주세요
+                </h2>
+                <p className="text-xl text-slate-500 mb-10 max-w-lg leading-relaxed">
+                  {report.message}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                  <div className="bg-slate-50 p-6 rounded-[24px] text-left">
+                    <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                      <CheckCircle size={16} className="text-blue-500" /> 분석
+                      가능한 내용
+                    </h4>
+                    <p className="text-sm text-slate-500">
+                      임대차 계약서 조항, 근로계약서 손해배상 문구, 비밀유지
+                      서약 등
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-[24px] text-left">
+                    <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                      <X size={16} className="text-red-500" /> 분석 불가능한
+                      내용
+                    </h4>
+                    <p className="text-sm text-slate-500">
+                      단순 인사말, 법률과 무관한 일상 대화, 욕설 또는 부적절한
+                      문장
+                    </p>
                   </div>
                 </div>
               </div>

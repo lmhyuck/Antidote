@@ -1,8 +1,12 @@
 import fitz
 import torch
 import logging
+import json
+import google.generativeai as genai
 import torch.nn.functional as F
 from datetime import datetime
+from typing import Dict, Any
+
 from app.core.model_loader import ml_engine
 from .text_processor import TextProcessor
 from .db_search import DBSearch
@@ -14,11 +18,55 @@ class LegalAnalyzer:
     def __init__(self):
         self.processor = TextProcessor()
         self.db_search = DBSearch()
+        # self.guardrail_model = ml_engine.get_guardrail_model()
+        
+        # self.SYSTEM_PROMPT = """
+        # 너는 법률 계약 검토 서비스 'ANTIDOTE'의 안내원이야. 
+        # 입력된 텍스트가 '계약서 조항 분석'이나 '법률적 위험도 확인'과 관련이 있는지 판단해줘.
 
-    def analyze(self, text: str, doc_name: str):
+        # [판단 기준]
+        # 1. 계약서 조항(임금, 해고, 비밀유지 등)이거나 법적 권리 질문인 경우: {"is_valid": true}
+        # 2. 일상 대화, 맛집 질문, 단순 지식 질문인 경우: {"is_valid": false, "guide_message": "정중한 안내 텍스트"}
+
+        # 가이드 메시지 예시: "ANTIDOTE는 계약서의 독소 조항을 분석하는 전문 서비스입니다. 분석을 원하시는 조항을 복사하여 입력해 주세요."
+        # 반드시 JSON 형식으로만 응답해.
+        # """
+
+    # async def _check_validity(self, text: str):
+    #     if not self.guardrail_model:
+    #         return {"is_valid": True}
+    #     try:
+    #         # 이전 방식의 호출 문법
+    #         response = self.guardrail_model.generate_content(
+    #             f"{self.SYSTEM_PROMPT}\n\n사용자 입력: {text}",
+    #             generation_config=genai.types.GenerationConfig(
+    #                 temperature=0.1,
+    #                 response_mime_type="application/json"
+    #             )
+    #         )
+    #         return json.loads(response.text)
+    #     except Exception as e:
+    #         logger.error(f"Guardrail Error: {e}")
+    #         return {"is_valid": True}
+
+    async def analyze(self, text: str, doc_name: str):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # # 0. 가드레일 체크 (실패 시)
+        # validity = await self._check_validity(text)
+        # if not validity.get("is_valid", True):
+        #     return {
+        #         "status": "invalid_query",
+        #         "message": validity.get("guide_message", "계약서 조항을 입력해 주세요."),
+        #         "doc_name": doc_name,
+        #         "total_risk_score": 0.0,
+        #         "results": [],  # 프론트에서 map() 함수 에러 방지를 위해 빈 배열 유지
+        #         "analyzed_at": now
+        #     }
+
         # 1. 텍스트 청킹
         chunks = self.processor.smart_chunking(text)
-        analysis_results = [] # 모든 조항의 결과를 담을 리스트
+        analysis_results = []
         all_scores = []
         
         # 모델 및 디바이스 설정
@@ -31,7 +79,7 @@ class LegalAnalyzer:
             embedding_text = item['for_embedding']
 
             # 2. KoELECTRA-Small 추론 (위험 탐지)
-            inputs = small_tokenizer(original, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
+            inputs = small_tokenizer(original, return_tensors="pt", truncation=True, max_length=settings.MAX_SEQ_LENGTH, padding=True).to(device)
 
             with torch.no_grad():
                 outputs = small_model(**inputs)
@@ -42,50 +90,44 @@ class LegalAnalyzer:
 
             # 3. 판별 로직 (40점 기준 분기)
             if confidence >= 40:
-                # [위험/주의] 벡터 DB에서 관련 법령 및 판례 검색 (1차 후보군 10개 추출)
                 raw_laws, raw_precedents = self.db_search.get_related_data(embedding_text, top_k=10)
                 
-                # --- [추가] KoELECTRA-Base를 이용한 2차 정밀 검증 (Re-ranking) ---
+                # --- 중복 제거 로직 포함 정밀 검증 (Re-ranking) ---
                 refined_laws = []
+                seen_laws = set()
                 if raw_laws:
                     law_scores = []
                     for law in raw_laws:
-                        # 조항과 법령을 결합하여 교차 인코딩 (Cross-Encoding)
-                        law_inputs = base_tokenizer(
-                            original, law.summary, 
-                            return_tensors="pt", truncation=True, 
-                            max_length=settings.MAX_SEQ_LENGTH, padding=True
-                        ).to(device)
+                        if law.keyword in seen_laws: continue # 중복 제거
                         
+                        law_inputs = base_tokenizer(original, law.summary, return_tensors="pt", truncation=True, max_length=settings.MAX_SEQ_LENGTH, padding=True).to(device)
                         with torch.no_grad():
                             law_outputs = base_model(**law_inputs)
                             law_probs = F.softmax(law_outputs.logits, dim=-1)
-                            # 관련성 점수 추출 (Positive 확률)
                             rel_score = law_probs[0][1].item()
                             law_scores.append((rel_score, law))
-                    # 점수 순으로 정렬 후 상위 2개만 추출
+                            seen_laws.add(law.keyword)
+                    
                     law_scores.sort(key=lambda x: x[0], reverse=True)
                     refined_laws = [item[1] for item in law_scores[:2]]
 
                 refined_precedents = []
+                seen_pre = set()
                 if raw_precedents:
                     pre_scores = []
                     for pre in raw_precedents:
-                        pre_inputs = base_tokenizer(
-                            original, pre.content, 
-                            return_tensors="pt", truncation=True, 
-                            max_length=settings.MAX_SEQ_LENGTH, padding=True
-                        ).to(device)
-                        
+                        if pre.case_number in seen_pre: continue # 중복 제거
+
+                        pre_inputs = base_tokenizer(original, pre.content, return_tensors="pt", truncation=True, max_length=settings.MAX_SEQ_LENGTH, padding=True).to(device)
                         with torch.no_grad():
                             pre_outputs = base_model(**pre_inputs)
                             pre_probs = F.softmax(pre_outputs.logits, dim=-1)
                             rel_score = pre_probs[0][1].item()
                             pre_scores.append((rel_score, pre))
-                    # 점수 순으로 정렬 후 상위 2개만 추출
+                            seen_pre.add(pre.case_number)
+                    
                     pre_scores.sort(key=lambda x: x[0], reverse=True)
                     refined_precedents = [item[1] for item in pre_scores[:2]]
-                # -----------------------------------------------------------
 
                 analysis_results.append({
                     "clause": original,
@@ -97,7 +139,6 @@ class LegalAnalyzer:
                     "precedents": [{"title": p.case_number, "content": p.content} for p in refined_precedents]
                 })
             else:
-                # [안전] 40점 미만 조항
                 analysis_results.append({
                     "clause": original,
                     "level": "SAFE",
@@ -108,26 +149,22 @@ class LegalAnalyzer:
                     "precedents": []
                 })
 
-        # 4. 전체 위험도 산술 평균 산출 로직
-        if all_scores:
-            total_avg_score = sum(all_scores) / len(all_scores)
-            total_risk_score = round(total_avg_score, 2)
-            
-        else:
-            total_risk_score = 0
+        # 4. 전체 위험도 산출
+        total_risk_score = round(sum(all_scores) / len(all_scores), 2) if all_scores else 0
 
         return {
+            "status": "success",
+            "message": "분석이 성공적으로 완료되었습니다.",
             "doc_name": doc_name,
             "total_risk_score": total_risk_score,
             "results": analysis_results, 
-            "analyzed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "analyzed_at": now
         }
 
-    def analyze_pdf(self, file_content: bytes, filename: str):
+    async def analyze_pdf(self, file_content: bytes, filename: str):
         full_text = ""
         with fitz.open(stream=file_content, filetype="pdf") as doc:
             for page in doc:
                 full_text += page.get_text("text") + "\n"
-
         refined_text = self.processor.clean_pdf_text(full_text)
-        return self.analyze(refined_text, filename)
+        return await self.analyze(refined_text, filename)
