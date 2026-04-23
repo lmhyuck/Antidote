@@ -2,7 +2,6 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sentence_transformers import SentenceTransformer
 from app.core.config import settings
-import google.generativeai as genai
 
 
 class ModelLoader:

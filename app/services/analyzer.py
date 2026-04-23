@@ -2,7 +2,6 @@ import fitz
 import torch
 import logging
 import json
-import google.generativeai as genai
 import torch.nn.functional as F
 from datetime import datetime
 from typing import Dict, Any
