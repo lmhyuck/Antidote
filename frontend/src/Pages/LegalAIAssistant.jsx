@@ -185,7 +185,7 @@ const LegalAIAssistant = () => {
                 </span>
                 하세요
               </h1>
-              <p className="text-slate-500 mb-12 text-xl font-medium text-center max-w-2xl leading-relaxed">
+              <p className="text-slate-500 mb-12 text-base font-medium text-center max-w-2xl leading-relaxed">
                 의심되는 조항을 복사하여 붙여넣으세요. <br />
                 독소 조항 유무를 즉시 판별합니다.
               </p>
