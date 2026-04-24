@@ -69,6 +69,62 @@ const LegalAIAssistant = () => {
     { icon: <AlertTriangle size={20} />, label: "Risk Profiles" },
     { icon: <Bot size={20} />, label: "AI Assistant", active: true },
   ];
+  // 1. 전역에서 사용할 레벨별 설정 데이터
+  const LEVEL_CONFIG = {
+    SAFE: {
+      label: "Safe",
+      range: "0-19",
+      bg: "bg-green-50/50",
+      border: "border-green-100",
+      line: "bg-green-500",
+      tag: "bg-green-100 text-green-600",
+      text: "text-green-700",
+      desc: "법적으로 안전하며 표준적인 조항입니다.",
+    },
+    CAUTION: {
+      label: "Caution",
+      range: "20-39",
+      bg: "bg-yellow-50/50",
+      border: "border-yellow-100",
+      line: "bg-yellow-500",
+      tag: "bg-yellow-100 text-yellow-700",
+      text: "text-yellow-700",
+      desc: "일부 모호한 표현이 있어 확인이 필요합니다.",
+    },
+    WARNING: {
+      label: "Warning",
+      range: "40-59",
+      bg: "bg-orange-50/50",
+      border: "border-orange-100",
+      line: "bg-orange-500",
+      tag: "bg-orange-100 text-orange-600",
+      text: "text-orange-700",
+      desc: "주의가 필요한 조항입니다. 문구 수정을 권고합니다.",
+    },
+    DANGER: {
+      label: "Danger",
+      range: "60-79",
+      bg: "bg-red-50/50",
+      border: "border-red-100",
+      line: "bg-red-500",
+      tag: "bg-red-100 text-red-600",
+      text: "text-red-700",
+      desc: "독소 조항 가능성이 높으니 상세 분석을 확인하세요.",
+    },
+    EXTREME: {
+      label: "Extreme",
+      range: "80-100",
+      bg: "bg-red-900/5",
+      border: "border-red-900/20",
+      line: "bg-red-900",
+      tag: "bg-red-900 text-white",
+      text: "text-red-900",
+      desc: "심각한 법적 위험이 있으니 반드시 전문가와 상의하세요.",
+    },
+  };
+
+  // 2. 안전하게 설정을 가져오는 유틸 함수
+  const getLevelData = (level) => LEVEL_CONFIG[level] || LEVEL_CONFIG.SAFE;
 
   const uploadPDF = async (file) => {
     setIsLoading(true);
@@ -354,13 +410,13 @@ const LegalAIAssistant = () => {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                  {/* SAFE (추가됨) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+                  {/* 1. SAFE (0-19) */}
                   <div className="bg-green-50/50 border border-green-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
                     <span className="text-green-600 font-black text-sm mb-1 uppercase tracking-wider">
                       Safe
                     </span>
-                    <p className="text-3xl font-black text-green-700">0-39</p>
+                    <p className="text-3xl font-black text-green-700">0-19</p>
                     <p className="text-[11px] text-green-600/70 mt-2 font-medium">
                       법적으로 안전하며
                       <br />
@@ -368,12 +424,25 @@ const LegalAIAssistant = () => {
                     </p>
                   </div>
 
-                  {/* WARNING */}
+                  {/* 2. CAUTION (20-39) */}
+                  <div className="bg-yellow-50/50 border border-yellow-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
+                    <span className="text-yellow-600 font-black text-sm mb-1 uppercase tracking-wider">
+                      Caution
+                    </span>
+                    <p className="text-3xl font-black text-yellow-700">20-39</p>
+                    <p className="text-[11px] text-yellow-600/70 mt-2 font-medium">
+                      일부 모호한 표현이 있어
+                      <br />
+                      확인이 필요합니다.
+                    </p>
+                  </div>
+
+                  {/* 3. WARNING (40-59) */}
                   <div className="bg-orange-50/50 border border-orange-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
                     <span className="text-orange-600 font-black text-sm mb-1 uppercase tracking-wider">
                       Warning
                     </span>
-                    <p className="text-3xl font-black text-orange-700">40-69</p>
+                    <p className="text-3xl font-black text-orange-700">40-59</p>
                     <p className="text-[11px] text-orange-600/70 mt-2 font-medium">
                       주의가 필요한 조항입니다.
                       <br />
@@ -381,14 +450,27 @@ const LegalAIAssistant = () => {
                     </p>
                   </div>
 
-                  {/* DANGER */}
+                  {/* 4. DANGER (60-79) */}
                   <div className="bg-red-50/50 border border-red-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
                     <span className="text-red-600 font-black text-sm mb-1 uppercase tracking-wider">
                       Danger
                     </span>
-                    <p className="text-3xl font-black text-red-700">70-100</p>
+                    <p className="text-3xl font-black text-red-700">60-79</p>
                     <p className="text-[11px] text-red-600/70 mt-2 font-medium">
-                      독소 조항일 가능성이 높습니다.
+                      독소 조항 가능성이 높으니
+                      <br />
+                      상세 분석을 확인하세요.
+                    </p>
+                  </div>
+
+                  {/* 5. EXTREME (80-100) */}
+                  <div className="bg-red-900/5 border border-red-900/20 p-6 rounded-[24px] flex flex-col items-center justify-center text-center ring-1 ring-red-900/10">
+                    <span className="text-red-900 font-black text-sm mb-1 uppercase tracking-wider">
+                      Extreme
+                    </span>
+                    <p className="text-3xl font-black text-red-900">80-100</p>
+                    <p className="text-[11px] text-red-900/70 mt-2 font-medium">
+                      심각한 법적 위험이 있으니
                       <br />
                       반드시 전문가와 상의하세요.
                     </p>
@@ -396,7 +478,7 @@ const LegalAIAssistant = () => {
                 </div>
                 {/* 리포트 본문 콘텐츠 */}
                 <div className="max-w-4xl mx-auto px-4 py-10 space-y-12">
-                  {/* 1. 위험 및 경고 조항 섹션 (DANGER, WARNING) */}
+                  {/* 1. 위험 및 경고 조항 섹션 (DANGER, WARNING, CAUTION, EXTREME) */}
                   <section className="space-y-6">
                     <button
                       onClick={() => setIsRiskyOpen(!isRiskyOpen)}
@@ -410,9 +492,7 @@ const LegalAIAssistant = () => {
                         </span>
                       </h3>
                       <div
-                        className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-slate-200 transition-all ${
-                          isRiskyOpen ? "rotate-180" : ""
-                        }`}
+                        className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-slate-200 transition-all ${isRiskyOpen ? "rotate-180" : ""}`}
                       >
                         <ChevronDown size={20} />
                       </div>
@@ -421,104 +501,125 @@ const LegalAIAssistant = () => {
                     {isRiskyOpen && (
                       <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
                         {riskyClauses.length > 0 ? (
-                          riskyClauses.map((result, idx) => (
-                            <div
-                              key={`risky-${idx}`}
-                              className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
-                            >
+                          riskyClauses.map((result, idx) => {
+                            const style = getLevelData(result.level);
+                            return (
                               <div
-                                className={`absolute top-0 left-0 w-2 h-full ${
-                                  result.level === "DANGER"
-                                    ? "bg-red-500"
-                                    : "bg-orange-500"
-                                }`}
-                              />
+                                key={`risky-${idx}`}
+                                className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                              >
+                                <div
+                                  className={`absolute top-0 left-0 w-2 h-full ${style.line}`}
+                                />
+                                <div className="flex items-center justify-between mb-6">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase ${style.tag}`}
+                                    >
+                                      {result.level}
+                                    </span>
+                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
+                                      Confidence {result.score}%
+                                    </span>
+                                  </div>
+                                </div>
 
-                              <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`px-3 py-1 rounded-md text-[10px] font-black ${
-                                      result.level === "DANGER"
-                                        ? "bg-red-100 text-red-600"
-                                        : "bg-orange-100 text-orange-600"
-                                    }`}
-                                  >
-                                    {result.level}
-                                  </span>
-                                  <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
-                                    Confidence {result.score}%
-                                  </span>
+                                <p className="text-2xl text-slate-800 leading-relaxed font-semibold mb-8">
+                                  "{result.clause}"
+                                </p>
+
+                                {/* AI 분석 섹션: 이유와 수정 제안 분리 */}
+                                <div className="space-y-4 mb-8">
+                                  {/* 위반 사유 요약 */}
+                                  <div className="bg-slate-50 rounded-2xl p-6 border-l-4 border-slate-300">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="text-sm font-black text-slate-800">
+                                        💡 판단 근거
+                                      </span>
+                                    </div>
+                                    <p className="text-[15px] text-slate-600 leading-relaxed">
+                                      {result.reason}
+                                    </p>
+                                  </div>
+
+                                  {/* 표준 조항 수정안 */}
+                                  <div className="bg-slate-50 rounded-2xl p-6 border-l-4 border-slate-300">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="text-sm font-black text-slate-800">
+                                        💡 표준 조항 수정안
+                                      </span>
+                                    </div>
+                                    <p className="text-[15px] text-slate-600 leading-relaxed">
+                                      {result.proposed_text}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* 법령/판례 섹션 */}
+                                <div className="space-y-4 mb-8 px-2">
+                                  {result.legal_basis?.length > 0 && (
+                                    <div>
+                                      <h4 className="text-xs font-black text-blue-600 uppercase mb-3 flex items-center gap-2">
+                                        <span className="w-1 h-3 bg-blue-600 rounded-full"></span>{" "}
+                                        근거 법령
+                                      </h4>
+                                      <div className="grid gap-2">
+                                        {result.legal_basis.map((law, lIdx) => (
+                                          <div
+                                            key={lIdx}
+                                            className="text-[13px] bg-blue-50/50 p-4 rounded-xl border border-blue-100"
+                                          >
+                                            <span className="font-bold text-blue-800">
+                                              [{law.title}]
+                                            </span>{" "}
+                                            <span className="text-slate-600">
+                                              {law.summary}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {result.precedents?.length > 0 && (
+                                    <div className="mt-6">
+                                      <h4 className="text-xs font-black text-indigo-600 uppercase mb-3 flex items-center gap-2">
+                                        <span className="w-1 h-3 bg-indigo-600 rounded-full"></span>{" "}
+                                        관련 판례
+                                      </h4>
+                                      <div className="grid gap-2">
+                                        {result.precedents.map((pre, pIdx) => (
+                                          <div
+                                            key={pIdx}
+                                            className="text-[13px] bg-indigo-50/50 p-4 rounded-xl border border-indigo-100"
+                                          >
+                                            <span className="font-bold text-indigo-800">
+                                              [{pre.title}]
+                                            </span>
+                                            <p className="text-slate-600 leading-relaxed mt-1.5">
+                                              {pre.content}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* 태그 영역 */}
+                                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
+                                  {result.tags?.map((tag, tIdx) => (
+                                    <div
+                                      key={tIdx}
+                                      className="px-3 py-1.5 bg-slate-50 rounded-lg text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-default"
+                                    >
+                                      #{tag}
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-
-                              <p className="text-2xl text-slate-800 leading-relaxed font-medium mb-4">
-                                "{result.clause}"
-                              </p>
-
-                              <div className="bg-slate-50 border-l-4 border-slate-300 p-4 mb-6">
-                                <p className="text-sm text-slate-600 leading-relaxed">
-                                  <span className="font-bold text-slate-800">
-                                    💡 AI 분석:{" "}
-                                  </span>
-                                  {result.description}
-                                </p>
-                              </div>
-
-                              {/* 법령/판례 섹션 (기존 디자인 유지) */}
-                              <div className="space-y-4 mb-6">
-                                {result.legal_basis?.length > 0 && (
-                                  <div>
-                                    <h4 className="text-xs font-black text-blue-600 uppercase mb-2">
-                                      근거 법령
-                                    </h4>
-                                    {result.legal_basis.map((law, lIdx) => (
-                                      <div
-                                        key={lIdx}
-                                        className="text-sm bg-blue-50/50 p-3 rounded-xl border border-blue-100 mb-2"
-                                      >
-                                        <span className="font-bold text-blue-800">
-                                          [{law.title}]
-                                        </span>{" "}
-                                        {law.summary}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {result.precedents?.length > 0 && (
-                                  <div>
-                                    <h4 className="text-xs font-black text-indigo-600 uppercase mb-2">
-                                      관련 판례
-                                    </h4>
-                                    {result.precedents.map((pre, pIdx) => (
-                                      <div
-                                        key={pIdx}
-                                        className="text-sm bg-indigo-50/50 p-3 rounded-xl border border-indigo-100"
-                                      >
-                                        <span className="font-bold text-indigo-800">
-                                          [{pre.title}]
-                                        </span>
-                                        <p className="text-slate-600 leading-relaxed mt-1">
-                                          {pre.content}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* 태그 (이전에 수정한 가로 배열 버전) */}
-                              <div className="flex flex-wrap gap-2">
-                                {result.tags?.map((tag, tIdx) => (
-                                  <div
-                                    key={tIdx}
-                                    className="px-3 py-1.5 bg-slate-50 rounded-xl text-[11px] font-bold text-slate-500"
-                                  >
-                                    {tag}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))
+                            );
+                          })
                         ) : (
                           <div className="py-10 text-center text-slate-400 font-medium bg-white rounded-[32px] border border-dashed">
                             검출된 위험 조항이 없습니다.
@@ -541,9 +642,7 @@ const LegalAIAssistant = () => {
                         </span>
                       </h3>
                       <div
-                        className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-green-100 group-hover:text-green-600 transition-all ${
-                          isSafeOpen ? "rotate-180" : ""
-                        }`}
+                        className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-green-100 group-hover:text-green-600 transition-all ${isSafeOpen ? "rotate-180" : ""}`}
                       >
                         <ChevronDown size={20} />
                       </div>
@@ -551,52 +650,55 @@ const LegalAIAssistant = () => {
 
                     {isSafeOpen && (
                       <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        {safeClauses.map((result, idx) => (
-                          <div
-                            key={`safe-${idx}`}
-                            className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
-                          >
-                            {/* 위험 조항과 동일한 왼쪽 강조 라인 (초록색) */}
-                            <div className="absolute top-0 left-0 w-2 h-full bg-green-500" />
+                        {safeClauses.map((result, idx) => {
+                          const style = getLevelData("SAFE"); // 안전 섹션은 항상 SAFE 스타일 강제 적용 가능
+                          return (
+                            <div
+                              key={`safe-${idx}`}
+                              className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                            >
+                              <div
+                                className={`absolute top-0 left-0 w-2 h-full ${style.line}`}
+                              />
+                              <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`px-3 py-1 rounded-md text-[10px] font-black uppercase ${style.tag}`}
+                                  >
+                                    SAFE
+                                  </span>
+                                  <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
+                                    Confidence {result.score}%
+                                  </span>
+                                </div>
+                              </div>
 
-                            <div className="flex items-center justify-between mb-6">
-                              <div className="flex items-center gap-2">
-                                <span className="px-3 py-1 rounded-md text-[10px] font-black bg-green-100 text-green-600 uppercase">
-                                  SAFE
-                                </span>
-                                <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
-                                  Confidence {result.score}%
-                                </span>
+                              <p className="text-2xl text-slate-800 leading-relaxed font-medium mb-4">
+                                "{result.clause}"
+                              </p>
+
+                              <div className="bg-slate-50 border-l-4 border-slate-300 p-6 rounded-2xl mb-6">
+                                <p className="text-sm text-slate-600 leading-relaxed">
+                                  <span className="font-bold text-slate-800">
+                                    💡 AI 분석:{" "}
+                                  </span>
+                                  {result.reason}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
+                                {result.tags?.map((tag, tIdx) => (
+                                  <div
+                                    key={tIdx}
+                                    className="px-3 py-1.5 bg-slate-50 rounded-lg text-[11px] font-bold text-slate-500"
+                                  >
+                                    #{tag}
+                                  </div>
+                                ))}
                               </div>
                             </div>
-
-                            {/* 위험 조항과 동일한 2xl 폰트 사이즈 적용 */}
-                            <p className="text-2xl text-slate-800 leading-relaxed font-medium mb-4">
-                              "{result.clause}"
-                            </p>
-
-                            <div className="bg-slate-50 border-l-4 border-slate-300 p-4 mb-6">
-                              <p className="text-sm text-slate-600 leading-relaxed">
-                                <span className="font-bold text-slate-800">
-                                  💡 AI 분석:{" "}
-                                </span>
-                                {result.description}
-                              </p>
-                            </div>
-
-                            {/* 태그 영역 - 위험 조항과 동일한 여백 및 스타일 */}
-                            <div className="flex flex-wrap gap-2">
-                              {result.tags?.map((tag, tIdx) => (
-                                <div
-                                  key={tIdx}
-                                  className="px-3 py-1.5 bg-slate-50 rounded-xl text-[11px] font-bold text-slate-500"
-                                >
-                                  {tag}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </section>

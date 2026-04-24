@@ -6,30 +6,29 @@ class TextInput(BaseModel):
     content: str
     doc_name: Optional[str] = "Direct Input"
 
-# 법령 상세 정보
 class LegalBasis(BaseModel):
     title: str
     summary: str
 
-# 판례 상세 정보
 class PrecedentDetail(BaseModel):
     title: str
     content: str
 
-# 결과 항목 상세 (서비스 로직과 1:1 매칭)
+# --- 수정 및 추가된 부분 ---
 class ResultDetail(BaseModel):
     clause: str
-    level: str  # DANGER, WARNING, SAFE
+    level: str            
     score: float
-    description: str
-    tags: List[str] = []
+    # 개별 렌더링을 위한 필드 추가
+    reason: str = ""       # 판단 근거
+    proposed_text: str = "" # 수정 제안 문구
     legal_basis: List[LegalBasis] = []
     precedents: List[PrecedentDetail] = []
+    tags: List[str] = []
 
-# 최종 응답 리포트
 class AnalysisReport(BaseModel):
-    status: str # "success" 또는 "invalid_query"
-    message: str # 성공 시 "분석 완료", 실패 시 가이드 메시지
+    status: str 
+    message: str 
     doc_name: str
     total_risk_score: float
     results: List[ResultDetail]
