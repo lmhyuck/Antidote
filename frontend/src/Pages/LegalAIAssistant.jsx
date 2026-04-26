@@ -32,6 +32,8 @@ import {
   Scale,
   X,
   Menu,
+  Gavel,
+  MessageSquare,
 } from "lucide-react"; // lucide-react 아이콘들
 
 const LegalAIAssistant = () => {
@@ -55,13 +57,26 @@ const LegalAIAssistant = () => {
   // [추가] 가이드라인 모드 여부 판단 (status가 success가 아니면 가이드 모드)
   const isGuideMode = report && report.status === "invalid_query";
 
-  // [추가] 데이터 분리 로직 (report가 있을 때만 작동)
+  const [activeTab, setActiveTab] = useState(0);
+  const allResults = report?.results || [];
+  const generalClauses = allResults.filter((r) => r.result_type === "GENERAL");
+  const analysisClauses = allResults.filter(
+    (r) => r.result_type === "ANALYSIS"
+  );
+  // 2. 위험 및 주의 조항 (ANALYSIS 중 위험군)
   const riskyClauses =
     report?.results?.filter(
-      (item) => item.level === "DANGER" || item.level === "WARNING",
+      (item) =>
+        item.result_type === "ANALYSIS" &&
+        ["EXTREME", "DANGER", "WARNING", "CAUTION"].includes(item.level)
     ) || [];
+
+  // 3. 안전 조항 (ANALYSIS 중 SAFE)
   const safeClauses =
-    report?.results?.filter((item) => item.level === "SAFE") || [];
+    report?.results?.filter(
+      (item) => item.result_type === "ANALYSIS" && item.level === "SAFE"
+    ) || [];
+
   const navItems = [
     { icon: <FolderOpen size={20} />, label: "Active Cases" },
     { icon: <FileText size={20} />, label: "Document Library" },
@@ -134,7 +149,7 @@ const LegalAIAssistant = () => {
     try {
       const response = await axios.post(
         "http://localhost:8000/analysis/contract", // 또는 설정하신 경로
-        formData,
+        formData
       );
 
       // 2. 백엔드에서 보낸 LegalReport 객체가 response.data에 들어있음
@@ -365,345 +380,432 @@ const LegalAIAssistant = () => {
                   size={20}
                   className="group-hover:-translate-x-1 transition-transform"
                 />
-                다른 조항 분석하기
+                질문 & 다른 조항 분석하기
               </button>
-
-              <div className="bg-white rounded-[48px] shadow-2xl shadow-blue-900/10 border border-white overflow-hidden">
-                {/* 리포트 상단 요약 바 */}
-                <div className="bg-slate-900 px-12 py-16 text-white flex justify-between items-center">
-                  <div>
-                    <h2 className="text-4xl font-black mb-4 tracking-tight">
-                      계약 조항 분석 리포트
-                    </h2>
-                    <div className="flex gap-3">
-                      <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-md text-[10px] font-black uppercase tracking-widest border border-red-500/30">
-                        Priority High
-                      </span>
-                      <span className="text-slate-400 text-xs font-bold uppercase flex items-center gap-1">
-                        <Info size={14} /> Analyzed at {report.analyzed_at}
-                      </span>
-                    </div>
+              {/* 0. 단순 질문 답변 섹션 (GENERAL) - 탭 스타일 */}
+              {generalClauses.length > 0 && (
+                <section className="space-y-6 mb-16 animate-in fade-in duration-700">
+                  <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <MessageSquare className="text-blue-500" size={28} />
+                    <h3 className="text-2xl font-black text-slate-900">
+                      질문 답변 안내
+                    </h3>
                   </div>
-                  <div className="flex gap-8 items-center">
-                    <div className="text-right">
-                      <p className="text-slate-400 text-[10px] font-black uppercase mb-1 tracking-tighter">
-                        Total Clauses
-                      </p>
-                      <p className="text-3xl font-black">
-                        {report.results?.length || 0}
-                      </p>
-                    </div>
-                    <div className="h-12 w-[1px] bg-white/10"></div>
-                    <div className="text-right">
-                      <p className="text-slate-400 text-[10px] font-black uppercase mb-1 tracking-tighter">
-                        Danger Score
-                      </p>
-                      <p
-                        className={`text-6xl font-black ${
-                          report.total_risk_score >= 70
-                            ? "text-red-500"
-                            : "text-orange-500"
+
+                  {/* 탭 리스트: 질문이 많아질 경우를 대비해 가로 스크롤(scrollbar-hide) 적용 */}
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {generalClauses.map((_, idx) => (
+                      <button
+                        key={`tab-${idx}`}
+                        onClick={() => setActiveTab(idx)} // useState로 activeTab 관리 필요
+                        className={`px-6 py-3 rounded-full text-sm font-bold transition-all whitespace-nowrap ${
+                          activeTab === idx
+                            ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
+                            : "bg-white text-slate-400 border border-slate-200 hover:border-blue-300 hover:text-blue-500"
                         }`}
                       >
-                        {report.total_risk_score}
+                        질문 {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 선택된 탭의 컨텐츠 영역 */}
+                  <div className="relative">
+                    {generalClauses.map(
+                      (result, idx) =>
+                        idx === activeTab && (
+                          <div
+                            key={`content-${idx}`}
+                            className="p-8 md:p-12 rounded-[40px] border border-blue-50 bg-white shadow-xl shadow-blue-50/50 animate-in zoom-in-95 slide-in-from-bottom-4 duration-500"
+                          >
+                            <div className="flex items-center gap-4 mb-8">
+                              <span className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 font-black text-xl">
+                                Q
+                              </span>
+                              <p className="text-xl md:text-2xl text-slate-800 font-bold leading-tight">
+                                {result.clause}
+                              </p>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-[32px] p-8 md:p-10 border border-slate-100 relative mt-4">
+                              <div className="absolute -top-4 left-10 px-4 py-1.5 bg-blue-600 rounded-full text-[12px] font-black text-white uppercase tracking-widest shadow-md">
+                                Antidote AI Answer
+                              </div>
+                              <p className="text-[17px] text-slate-600 leading-[1.8] whitespace-pre-wrap">
+                                {result.proposed_text}
+                              </p>
+
+                              {/* 하단 장식용 아이콘 */}
+                              <div className="absolute bottom-6 right-8 opacity-10">
+                                <MessageSquare
+                                  size={60}
+                                  className="text-blue-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                    )}
+                  </div>
+                </section>
+              )}
+              {analysisClauses.length > 0 && (
+                <div className="bg-white rounded-[48px] shadow-2xl shadow-blue-900/10 border border-white overflow-hidden">
+                  {/* 리포트 상단 요약 바 */}
+                  <div className="bg-slate-900 px-12 py-16 text-white flex justify-between items-center">
+                    <div>
+                      <h2 className="text-4xl font-black mb-4 tracking-tight">
+                        계약 조항 분석 리포트
+                      </h2>
+                      <div className="flex gap-3">
+                        <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-md text-[10px] font-black uppercase tracking-widest border border-red-500/30">
+                          Priority High
+                        </span>
+                        <span className="text-slate-400 text-xs font-bold uppercase flex items-center gap-1">
+                          <Info size={14} /> Analyzed at {report.analyzed_at}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-8 items-center">
+                      <div className="text-right">
+                        <p className="text-slate-400 text-[10px] font-black uppercase mb-1 tracking-tighter">
+                          Total Clauses
+                        </p>
+                        <p className="text-3xl font-black">
+                          {report.results?.length || 0}
+                        </p>
+                      </div>
+                      <div className="h-12 w-[1px] bg-white/10"></div>
+                      <div className="text-right">
+                        <p className="text-slate-400 text-[10px] font-black uppercase mb-1 tracking-tighter">
+                          Danger Score
+                        </p>
+                        <p
+                          className={`text-6xl font-black ${
+                            report.total_risk_score >= 70
+                              ? "text-red-500"
+                              : "text-orange-500"
+                          }`}
+                        >
+                          {report.total_risk_score}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+                    {/* 1. SAFE (0-19) */}
+                    <div className="bg-green-50/50 border border-green-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
+                      <span className="text-green-600 font-black text-sm mb-1 uppercase tracking-wider">
+                        Safe
+                      </span>
+                      <p className="text-3xl font-black text-green-700">0-19</p>
+                      <p className="text-[11px] text-green-600/70 mt-2 font-medium">
+                        법적으로 안전하며
+                        <br />
+                        표준적인 조항입니다.
+                      </p>
+                    </div>
+
+                    {/* 2. CAUTION (20-39) */}
+                    <div className="bg-yellow-50/50 border border-yellow-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
+                      <span className="text-yellow-600 font-black text-sm mb-1 uppercase tracking-wider">
+                        Caution
+                      </span>
+                      <p className="text-3xl font-black text-yellow-700">
+                        20-39
+                      </p>
+                      <p className="text-[11px] text-yellow-600/70 mt-2 font-medium">
+                        일부 모호한 표현이 있어
+                        <br />
+                        확인이 필요합니다.
+                      </p>
+                    </div>
+
+                    {/* 3. WARNING (40-59) */}
+                    <div className="bg-orange-50/50 border border-orange-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
+                      <span className="text-orange-600 font-black text-sm mb-1 uppercase tracking-wider">
+                        Warning
+                      </span>
+                      <p className="text-3xl font-black text-orange-700">
+                        40-59
+                      </p>
+                      <p className="text-[11px] text-orange-600/70 mt-2 font-medium">
+                        주의가 필요한 조항입니다.
+                        <br />
+                        문구 수정을 권고합니다.
+                      </p>
+                    </div>
+
+                    {/* 4. DANGER (60-79) */}
+                    <div className="bg-red-50/50 border border-red-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
+                      <span className="text-red-600 font-black text-sm mb-1 uppercase tracking-wider">
+                        Danger
+                      </span>
+                      <p className="text-3xl font-black text-red-700">60-79</p>
+                      <p className="text-[11px] text-red-600/70 mt-2 font-medium">
+                        독소 조항 가능성이 높으니
+                        <br />
+                        상세 분석을 확인하세요.
+                      </p>
+                    </div>
+
+                    {/* 5. EXTREME (80-100) */}
+                    <div className="bg-red-900/5 border border-red-900/20 p-6 rounded-[24px] flex flex-col items-center justify-center text-center ring-1 ring-red-900/10">
+                      <span className="text-red-900 font-black text-sm mb-1 uppercase tracking-wider">
+                        Extreme
+                      </span>
+                      <p className="text-3xl font-black text-red-900">80-100</p>
+                      <p className="text-[11px] text-red-900/70 mt-2 font-medium">
+                        심각한 법적 위험이 있으니
+                        <br />
+                        반드시 전문가와 상의하세요.
                       </p>
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
-                  {/* 1. SAFE (0-19) */}
-                  <div className="bg-green-50/50 border border-green-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
-                    <span className="text-green-600 font-black text-sm mb-1 uppercase tracking-wider">
-                      Safe
-                    </span>
-                    <p className="text-3xl font-black text-green-700">0-19</p>
-                    <p className="text-[11px] text-green-600/70 mt-2 font-medium">
-                      법적으로 안전하며
-                      <br />
-                      표준적인 조항입니다.
-                    </p>
-                  </div>
-
-                  {/* 2. CAUTION (20-39) */}
-                  <div className="bg-yellow-50/50 border border-yellow-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
-                    <span className="text-yellow-600 font-black text-sm mb-1 uppercase tracking-wider">
-                      Caution
-                    </span>
-                    <p className="text-3xl font-black text-yellow-700">20-39</p>
-                    <p className="text-[11px] text-yellow-600/70 mt-2 font-medium">
-                      일부 모호한 표현이 있어
-                      <br />
-                      확인이 필요합니다.
-                    </p>
-                  </div>
-
-                  {/* 3. WARNING (40-59) */}
-                  <div className="bg-orange-50/50 border border-orange-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
-                    <span className="text-orange-600 font-black text-sm mb-1 uppercase tracking-wider">
-                      Warning
-                    </span>
-                    <p className="text-3xl font-black text-orange-700">40-59</p>
-                    <p className="text-[11px] text-orange-600/70 mt-2 font-medium">
-                      주의가 필요한 조항입니다.
-                      <br />
-                      문구 수정을 권고합니다.
-                    </p>
-                  </div>
-
-                  {/* 4. DANGER (60-79) */}
-                  <div className="bg-red-50/50 border border-red-100 p-6 rounded-[24px] flex flex-col items-center justify-center text-center">
-                    <span className="text-red-600 font-black text-sm mb-1 uppercase tracking-wider">
-                      Danger
-                    </span>
-                    <p className="text-3xl font-black text-red-700">60-79</p>
-                    <p className="text-[11px] text-red-600/70 mt-2 font-medium">
-                      독소 조항 가능성이 높으니
-                      <br />
-                      상세 분석을 확인하세요.
-                    </p>
-                  </div>
-
-                  {/* 5. EXTREME (80-100) */}
-                  <div className="bg-red-900/5 border border-red-900/20 p-6 rounded-[24px] flex flex-col items-center justify-center text-center ring-1 ring-red-900/10">
-                    <span className="text-red-900 font-black text-sm mb-1 uppercase tracking-wider">
-                      Extreme
-                    </span>
-                    <p className="text-3xl font-black text-red-900">80-100</p>
-                    <p className="text-[11px] text-red-900/70 mt-2 font-medium">
-                      심각한 법적 위험이 있으니
-                      <br />
-                      반드시 전문가와 상의하세요.
-                    </p>
-                  </div>
-                </div>
-                {/* 리포트 본문 콘텐츠 */}
-                <div className="max-w-4xl mx-auto px-4 py-10 space-y-12">
-                  {/* 1. 위험 및 경고 조항 섹션 (DANGER, WARNING, CAUTION, EXTREME) */}
-                  <section className="space-y-6">
-                    <button
-                      onClick={() => setIsRiskyOpen(!isRiskyOpen)}
-                      className="w-full flex items-center justify-between group"
-                    >
-                      <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                        <AlertTriangle className="text-red-500" size={28} />
-                        발견된 위험 조항 상세
-                        <span className="text-red-500 text-lg font-medium">
-                          ({riskyClauses.length})
-                        </span>
-                      </h3>
-                      <div
-                        className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-slate-200 transition-all ${isRiskyOpen ? "rotate-180" : ""}`}
+                  {/* 리포트 본문 콘텐츠 */}
+                  <div className="max-w-4xl mx-auto px-4 py-10 space-y-12">
+                    {/* 1. 위험 및 경고 조항 섹션 (DANGER, WARNING, CAUTION, EXTREME) */}
+                    <section className="space-y-6">
+                      <button
+                        onClick={() => setIsRiskyOpen(!isRiskyOpen)}
+                        className="w-full flex items-center justify-between group"
                       >
-                        <ChevronDown size={20} />
-                      </div>
-                    </button>
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                          <AlertTriangle className="text-red-500" size={28} />
+                          발견된 위험 조항 상세
+                          <span className="text-red-500 text-lg font-medium">
+                            ({riskyClauses.length})
+                          </span>
+                        </h3>
+                        <div
+                          className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-slate-200 transition-all ${
+                            isRiskyOpen ? "rotate-180" : ""
+                          }`}
+                        >
+                          <ChevronDown size={20} />
+                        </div>
+                      </button>
 
-                    {isRiskyOpen && (
-                      <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        {riskyClauses.length > 0 ? (
-                          riskyClauses.map((result, idx) => {
-                            const style = getLevelData(result.level);
-                            return (
-                              <div
-                                key={`risky-${idx}`}
-                                className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
-                              >
+                      {isRiskyOpen && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                          {riskyClauses.length > 0 ? (
+                            riskyClauses.map((result, idx) => {
+                              const style = getLevelData(result.level);
+                              return (
                                 <div
-                                  className={`absolute top-0 left-0 w-2 h-full ${style.line}`}
-                                />
-                                <div className="flex items-center justify-between mb-6">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase ${style.tag}`}
-                                    >
-                                      {result.level}
-                                    </span>
-                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
-                                      Confidence {result.score}%
-                                    </span>
-                                  </div>
-                                </div>
+                                  key={`risky-${idx}`}
+                                  className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                                >
+                                  <div
+                                    className={`absolute top-0 left-0 w-2 h-full ${style.line}`}
+                                  />
 
-                                <p className="text-2xl text-slate-800 leading-relaxed font-semibold mb-8">
-                                  "{result.clause}"
-                                </p>
+                                  {/* 1. 입력 질문 (조항 문구) */}
+                                  <p className="text-2xl text-slate-800 leading-relaxed font-semibold mb-6">
+                                    "{result.clause}"
+                                  </p>
 
-                                {/* AI 분석 섹션: 이유와 수정 제안 분리 */}
-                                <div className="space-y-4 mb-8">
-                                  {/* 위반 사유 요약 */}
-                                  <div className="bg-slate-50 rounded-2xl p-6 border-l-4 border-slate-300">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className="text-sm font-black text-slate-800">
-                                        💡 판단 근거
+                                  {/* 2. [신규 배치] 위험 등급 및 위험률 표시 영역 */}
+                                  <div className="flex items-center gap-4 mb-8 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                                    <div className="flex flex-col border-r border-slate-200 pr-4">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                        Risk Level
+                                      </span>
+                                      <span
+                                        className={`px-3 py-1 rounded-md text-xs font-black uppercase shadow-sm inline-block ${style.tag}`}
+                                      >
+                                        {result.level}
                                       </span>
                                     </div>
-                                    <p className="text-[15px] text-slate-600 leading-relaxed">
-                                      {result.reason}
-                                    </p>
-                                  </div>
 
-                                  {/* 표준 조항 수정안 */}
-                                  <div className="bg-slate-50 rounded-2xl p-6 border-l-4 border-slate-300">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className="text-sm font-black text-slate-800">
-                                        💡 표준 조항 수정안
+                                    <div className="flex flex-col flex-1">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                        AI Confidence Score
                                       </span>
-                                    </div>
-                                    <p className="text-[15px] text-slate-600 leading-relaxed">
-                                      {result.proposed_text}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* 법령/판례 섹션 */}
-                                <div className="space-y-4 mb-8 px-2">
-                                  {result.legal_basis?.length > 0 && (
-                                    <div>
-                                      <h4 className="text-xs font-black text-blue-600 uppercase mb-3 flex items-center gap-2">
-                                        <span className="w-1 h-3 bg-blue-600 rounded-full"></span>{" "}
-                                        근거 법령
-                                      </h4>
-                                      <div className="grid gap-2">
-                                        {result.legal_basis.map((law, lIdx) => (
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden max-w-[100px]">
                                           <div
-                                            key={lIdx}
-                                            className="text-[13px] bg-blue-50/50 p-4 rounded-xl border border-blue-100"
-                                          >
-                                            <span className="font-bold text-blue-800">
-                                              [{law.title}]
-                                            </span>{" "}
-                                            <span className="text-slate-600">
-                                              {law.summary}
-                                            </span>
-                                          </div>
-                                        ))}
+                                            className={`h-full ${style.line} transition-all duration-500`}
+                                            style={{
+                                              width: `${result.score}%`,
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-600">
+                                          {result.score}%
+                                        </span>
                                       </div>
                                     </div>
-                                  )}
+                                  </div>
 
-                                  {result.precedents?.length > 0 && (
+                                  <div className="space-y-6 px-2">
+                                    {/* 3. 판단 근거 */}
+                                    <div className="bg-slate-50 rounded-2xl p-6 border-l-4 border-slate-300">
+                                      <h4 className="text-sm font-black text-slate-800 mb-2 flex items-center gap-2">
+                                        <Scale
+                                          size={16}
+                                          className="text-slate-500"
+                                        />{" "}
+                                        판단 근거
+                                      </h4>
+                                      <p className="text-[15px] text-slate-600 leading-relaxed">
+                                        {result.reason}
+                                      </p>
+                                    </div>
+
+                                    {/* 4. 근거 법령 */}
+                                    {result.legal_basis?.length > 0 && (
+                                      <div>
+                                        <h4 className="text-xs font-black text-blue-600 uppercase mb-3 flex items-center gap-2">
+                                          <span className="w-1 h-3 bg-blue-600 rounded-full"></span>{" "}
+                                          근거 법령 (근로기준법)
+                                        </h4>
+                                        <div className="grid gap-2">
+                                          {result.legal_basis.map(
+                                            (law, lIdx) => (
+                                              <div
+                                                key={lIdx}
+                                                className="text-[13px] bg-blue-50/50 p-4 rounded-xl border border-blue-100"
+                                              >
+                                                <span className="font-bold text-blue-800">
+                                                  [{law.title}]
+                                                </span>{" "}
+                                                <span className="text-slate-600">
+                                                  {law.summary}
+                                                </span>
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* 5. 관련 판례 */}
                                     <div className="mt-6">
                                       <h4 className="text-xs font-black text-indigo-600 uppercase mb-3 flex items-center gap-2">
                                         <span className="w-1 h-3 bg-indigo-600 rounded-full"></span>{" "}
                                         관련 판례
                                       </h4>
-                                      <div className="grid gap-2">
-                                        {result.precedents.map((pre, pIdx) => (
-                                          <div
-                                            key={pIdx}
-                                            className="text-[13px] bg-indigo-50/50 p-4 rounded-xl border border-indigo-100"
-                                          >
-                                            <span className="font-bold text-indigo-800">
-                                              [{pre.title}]
-                                            </span>
-                                            <p className="text-slate-600 leading-relaxed mt-1.5">
-                                              {pre.content}
-                                            </p>
-                                          </div>
-                                        ))}
+
+                                      {result.precedents &&
+                                      result.precedents.length > 0 ? (
+                                        <div className="grid gap-2">
+                                          {result.precedents.map(
+                                            (pre, pIdx) => (
+                                              <div
+                                                key={pIdx}
+                                                className="text-[13px] bg-indigo-50/50 p-4 rounded-xl border border-indigo-100"
+                                              >
+                                                <span className="font-bold text-indigo-800">
+                                                  [{pre.title}]
+                                                </span>
+                                                <p className="text-slate-600 leading-relaxed mt-1.5">
+                                                  {pre.content}
+                                                </p>
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
+                                      ) : (
+                                        /* 판례가 없을 때 보여줄 안내 메시지 */
+                                        <div className="text-[13px] text-slate-400 bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
+                                          해당 조항과 직접적으로 일치하는 공인된
+                                          판례가 없습니다. 상단 '판단 근거' 및
+                                          '근거 법령'을 우선적으로 참고하시기
+                                          바랍니다.
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* 6. 표준 조항 수정안 */}
+                                    <div className="bg-green-50 rounded-2xl p-6 border-l-4 border-green-400 mt-8 shadow-inner">
+                                      <h4 className="text-sm font-black text-green-800 mb-2 flex items-center gap-2">
+                                        <CheckCircle2 size={16} /> 표준 조항
+                                        수정안
+                                      </h4>
+                                      <p className="text-[15px] text-green-900 font-medium leading-relaxed italic">
+                                        "{result.proposed_text}"
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* 7. 태그 영역 */}
+                                  <div className="flex flex-wrap gap-2 pt-6 mt-8 border-t border-slate-50">
+                                    {result.tags?.map((tag, tIdx) => (
+                                      <div
+                                        key={tIdx}
+                                        className="px-3 py-1.5 bg-slate-50 rounded-lg text-[11px] font-bold text-slate-500"
+                                      >
+                                        #{tag}
                                       </div>
-                                    </div>
-                                  )}
+                                    ))}
+                                  </div>
                                 </div>
+                              );
+                            })
+                          ) : (
+                            <div className="py-10 text-center text-slate-400 font-medium bg-white rounded-[32px] border border-dashed">
+                              검출된 위험 조항이 없습니다.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
 
-                                {/* 태그 영역 */}
-                                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                                  {result.tags?.map((tag, tIdx) => (
-                                    <div
-                                      key={tIdx}
-                                      className="px-3 py-1.5 bg-slate-50 rounded-lg text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-default"
-                                    >
-                                      #{tag}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="py-10 text-center text-slate-400 font-medium bg-white rounded-[32px] border border-dashed">
-                            검출된 위험 조항이 없습니다.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </section>
-                  {/* 2. 안전 조항 섹션 (SAFE) */}
-                  <section className="space-y-6 pt-4">
-                    <button
-                      onClick={() => setIsSafeOpen(!isSafeOpen)}
-                      className="w-full flex items-center justify-between group"
-                    >
-                      <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                        <ShieldCheck className="text-green-500" size={28} />
-                        검토 완료된 안전 조항
-                        <span className="text-green-500 text-lg font-medium">
-                          ({safeClauses.length})
-                        </span>
-                      </h3>
-                      <div
-                        className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-green-100 group-hover:text-green-600 transition-all ${isSafeOpen ? "rotate-180" : ""}`}
+                    {/* 2. 안전 조항 섹션 (SAFE) */}
+                    <section className="space-y-6 pt-4">
+                      <button
+                        onClick={() => setIsSafeOpen(!isSafeOpen)}
+                        className="w-full flex items-center justify-between group"
                       >
-                        <ChevronDown size={20} />
-                      </div>
-                    </button>
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                          <ShieldCheck className="text-green-500" size={28} />
+                          검토 완료된 안전 조항
+                          <span className="text-green-500 text-lg font-medium">
+                            ({safeClauses.length})
+                          </span>
+                        </h3>
+                        <div
+                          className={`p-2 rounded-full bg-slate-100 text-slate-400 group-hover:bg-green-100 transition-all ${
+                            isSafeOpen ? "rotate-180" : ""
+                          }`}
+                        >
+                          <ChevronDown size={20} />
+                        </div>
+                      </button>
 
-                    {isSafeOpen && (
-                      <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        {safeClauses.map((result, idx) => {
-                          const style = getLevelData("SAFE"); // 안전 섹션은 항상 SAFE 스타일 강제 적용 가능
-                          return (
+                      {isSafeOpen && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                          {safeClauses.map((result, idx) => (
                             <div
                               key={`safe-${idx}`}
-                              className="group p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                              className="p-10 rounded-[32px] border border-slate-100 bg-white shadow-sm relative overflow-hidden"
                             >
-                              <div
-                                className={`absolute top-0 left-0 w-2 h-full ${style.line}`}
-                              />
-                              <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`px-3 py-1 rounded-md text-[10px] font-black uppercase ${style.tag}`}
-                                  >
-                                    SAFE
-                                  </span>
-                                  <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
-                                    Confidence {result.score}%
-                                  </span>
-                                </div>
+                              <div className="absolute top-0 left-0 w-2 h-full bg-green-400" />
+                              <div className="flex items-center gap-2 mb-6">
+                                <span className="px-3 py-1 rounded-md text-[10px] font-black uppercase bg-green-50 text-green-600">
+                                  SAFE
+                                </span>
                               </div>
-
-                              <p className="text-2xl text-slate-800 leading-relaxed font-medium mb-4">
+                              <p className="text-2xl text-slate-800 leading-relaxed font-medium mb-4 italic">
                                 "{result.clause}"
                               </p>
-
-                              <div className="bg-slate-50 border-l-4 border-slate-300 p-6 rounded-2xl mb-6">
+                              <div className="bg-slate-50 border-l-4 border-slate-300 p-6 rounded-2xl">
                                 <p className="text-sm text-slate-600 leading-relaxed">
                                   <span className="font-bold text-slate-800">
                                     💡 AI 분석:{" "}
-                                  </span>
+                                  </span>{" "}
                                   {result.reason}
                                 </p>
                               </div>
-
-                              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                                {result.tags?.map((tag, tIdx) => (
-                                  <div
-                                    key={tIdx}
-                                    className="px-3 py-1.5 bg-slate-50 rounded-lg text-[11px] font-bold text-slate-500"
-                                  >
-                                    #{tag}
-                                  </div>
-                                ))}
-                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </section>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </main>

@@ -17,7 +17,8 @@ class PrecedentDetail(BaseModel):
 # --- 수정 및 추가된 부분 ---
 class ResultDetail(BaseModel):
     clause: str
-    level: str            
+    result_type: str        # "GENERAL" (질문) 또는 "ANALYSIS" (조항)
+    level: str              # SAFE, CAUTION, WARNING, DANGER, EXTREME           
     score: float
     # 개별 렌더링을 위한 필드 추가
     reason: str = ""       # 판단 근거
