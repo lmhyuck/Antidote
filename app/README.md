@@ -5,6 +5,7 @@
 #모델은 따로 다운로드 받아 프로젝트 내부에 위치시켜 .env파일에 경로 추가 ex) app/models/koELECTRA_small
 
 ```bash
+# venv 가상환경에서 진행 할 것 (없으면 만들고 진행)
 
 # 필수 패키지 설치
 pip install -r requirements.txt

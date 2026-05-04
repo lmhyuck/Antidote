@@ -1,9 +1,9 @@
-from sqlalchemy import Column, Integer, Text, String, Float, DateTime, create_engine, text
+from sqlalchemy import Column, Integer, Text, String, Float, DateTime, create_engine, text, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 from pgvector.sqlalchemy import Vector
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from app.core.config import settings
@@ -26,7 +26,7 @@ class Precedent(Base):
     content = Column(Text, nullable=False)                             # 판례 내용 원문
     embedding = Column(Vector(settings.BGE_M3_DIMENSION), nullable=False) # bge-m3 벡터
     
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 # 2. 근로기준법 데이터 테이블 (Statutes)
 class LaborLaw(Base):
@@ -49,25 +49,31 @@ class LaborLaw(Base):
     # 4. 벡터화 정보 (BGE-M3)
     embedding = Column(Vector(settings.BGE_M3_DIMENSION), nullable=False)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-# 3. 계약서 조항 분석 결과 테이블 (Analysis Results)
-class ContractAnalysis(Base):
+# 3. 구글 연동 분석 히스토리 테이블 (Analysis History)
+class AnalysisHistory(Base):
     """
-    분석된 독소 조항, 신뢰도, 결과, 수정본을 저장
+    구글 로그인 유저의 분석 이력을 통합 관리하는 테이블
     """
-    __tablename__ = 'contract_analysis'
+    __tablename__ = 'analysis_history'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    contract_id = Column(String, index=True, nullable=False)
-    original_clause = Column(Text, nullable=False)     # 분석 대상 원문 조항
     
-    prediction_result = Column(String)                # 독소 조항 여부 (Toxic/Safe)
-    confidence_score = Column(Float)                  # 모델 신뢰도
-    analysis_report = Column(Text)                    # 상세 분석 내용
-    suggested_revision = Column(Text)                 # AI가 제안한 수정본
+    # 구글에서 제공하는 고유 식별자 (sub)
+    google_id = Column(String, index=True, nullable=False)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # 메타데이터
+    doc_name = Column(String, nullable=False)          # 파일명 또는 "텍스트 분석"
+    mode = Column(String, nullable=False)              # "file" 또는 "text"
+    
+    # 분석 요약 및 결과
+    total_risk_score = Column(Float, nullable=False)   # 전체 위험도 점수
+    missing_clause_report = Column(Text, nullable=True)
+    results = Column(JSON, nullable=False)             # analysis_results 리스트 전체 저장
+    
+    # 시간 정보 (서버 시간 기준 KST 변환은 서비스 로직에서 처리 권장)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 # --- DB 엔진 및 초기화 ---
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
@@ -77,16 +83,24 @@ def init_db():
     """DB 초기화 및 벡터 인덱스 최적화"""
     try:
         with engine.connect() as conn:
+            # 1. 벡터 익스텐션 활성화
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             conn.commit()
+            
+            # 2. 테이블 생성
             Base.metadata.create_all(bind=engine)
             
-            # HNSW 인덱스: 판례와 법령 검색 속도 향상
+            # 3. 인덱스 생성
+            # 벡터 검색 최적화 (HNSW)
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_precedents_v ON precedents USING hnsw (embedding vector_cosine_ops);"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_labor_laws_v ON labor_laws USING hnsw (embedding vector_cosine_ops);"))
+            
+            # [추가] 히스토리 조회 최적화 (최신순 5개 필터링용)
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_history_user_date ON analysis_history (google_id, created_at DESC);"))
+            
             conn.commit()
             
-        logger.info("✅ Antidote 3-Tier DB Schema 구축 완료")
+            logger.info("✅ Antidote 4-Tier DB Schema (Auth 포함) 구축 완료")
     except SQLAlchemyError as e:
         logger.error(f"❌ DB 초기화 실패: {e}")
         raise

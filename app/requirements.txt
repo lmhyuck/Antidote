@@ -9,6 +9,12 @@ python-dotenv
 requests
 pandas
 
+# Google Auth & Token Verification
+google-auth==2.29.0
+
+# JWT (JSON Web Token) Implementation
+PyJWT==2.8.0 # 2.12.1
+
 # [Database]
 sqlalchemy
 psycopg2-binary

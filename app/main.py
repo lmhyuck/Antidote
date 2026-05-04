@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.lifecycle import startup_event  
-from app.routes.analysis import router
+from app.routes import analysis, history, auth
 
 # 로깅 설정
 logger = logging.getLogger("uvicorn.error")
@@ -41,7 +41,9 @@ app.add_middleware(
 )
 
 # 라우터 불러오기
-app.include_router(router)
+app.include_router(analysis.router) # /analysis/...
+app.include_router(history.router)  # /history/...
+app.include_router(auth.router)     # /auth/... (구글 로그인용)
 
 @app.get("/", status_code=status.HTTP_200_OK)
 def health_check():

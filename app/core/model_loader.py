@@ -9,15 +9,16 @@ class ModelLoader:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.genai_client = None
-        self.model_name = settings.GEMINI_MODEL_NAME 
 
         print("==================================================")
         print("⏳ Antidote AI Engines Loading... (Device: cpu)")
+        # config.py settings의 property를 사용하여 리스트를 바로 가져옵니다.
+        self.gemini_models = settings.gemini_models  # [수정부분]
         
         try:
             self.genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
             
-            print(f"✅ Gemini 3.1 SDK Ready: {self.model_name}")
+            print(f"✅ Gemini 3.1 SDK Ready: {self.gemini_models}")
         except Exception as e:
             print(f"❌ Gemini Setup Failed: {e}")
             
@@ -48,7 +49,7 @@ class ModelLoader:
         print("==================================================")
 
     def get_gemini_client(self):
-        return self.genai_client, self.model_name
+        return self.genai_client, self.gemini_models  # [수정부분]
 
     def get_small_model(self):
         return self.small_model, self.small_tokenizer

@@ -28,7 +28,16 @@ class Settings(BaseSettings):
     
     # [4] Gemini-api
     GEMINI_API_KEY: str
-    GEMINI_MODEL_NAME: str = "models/gemini-3.1-flash-lite-preview"
+    GEMINI_MODEL_LIST: str  # [수정부분]
+    @property
+    def gemini_models(self) -> list:
+        """쉼표로 구분된 문자열을 리스트로 변환"""
+        return [m.strip() for m in self.GEMINI_MODEL_LIST.split(",")]
+    
+    SECRET_KEY: str 
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24시간 
+    GOOGLE_CLIENT_ID: str
 
     # [5] Vector Dimensions
     BGE_M3_DIMENSION: int = 1024
